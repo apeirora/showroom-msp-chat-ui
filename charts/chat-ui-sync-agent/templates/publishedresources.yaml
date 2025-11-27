@@ -1,0 +1,19 @@
+{{- if .Values.publishedResources.enabled }}
+apiVersion: syncagent.kcp.io/v1alpha1
+kind: PublishedResource
+metadata:
+  name: publish-chat-ui-instances
+  namespace: {{ .Values.publishedResources.namespace | default .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: chat-ui-sync-agent
+    app.kubernetes.io/component: portal-integration
+spec:
+  resource:
+    kind: ChatUIInstance
+    apiGroup: ui.privatellms.msp
+    version: v1alpha1
+  naming:
+    namespace: "{{`{{ .ClusterName }}`}}"
+    name: "{{`{{ .Object.metadata.name }}`}}"
+{{- end }}
+

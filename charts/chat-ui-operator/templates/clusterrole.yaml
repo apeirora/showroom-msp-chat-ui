@@ -1,0 +1,21 @@
+{{- if .Values.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "chatui.fullname" . }}-manager-role
+rules:
+  - apiGroups: ["ui.privatellms.msp"]
+    resources: ["chatuiinstances", "chatuiinstances/status", "chatuiinstances/finalizers"]
+    verbs: ["get","list","watch","create","update","patch","delete"]
+  - apiGroups: [""]
+    resources: ["secrets","services","events"]
+    verbs: ["get","list","watch","create","update","patch","delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get","list","watch","create","update","patch","delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get","list","watch","create","update","patch","delete"]
+{{- end }}
+
+

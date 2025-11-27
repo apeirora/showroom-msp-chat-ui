@@ -1,0 +1,7 @@
+publicHost: chat-ui.private-llm.shop
+publicScheme: https
+contentPath: /pm-content.json
+branding:
+  marketplace:
+    title: "Chat UI Service"
+    description: "Chat UI services for OpenAI-compatible backends."
