@@ -66,7 +66,13 @@
                                         {
                                             "label": "Credentials Secret",
                                             "property": "spec.credentialsSecretRef.name",
-                                            "required": true
+                                            "required": true,
+                                            "dynamicValuesDefinition": {
+                                                "operation": "core.Secrets",
+                                                "gqlQuery": "query ($namespace: String!) { core { Secrets(namespace: $namespace) { metadata { name } } } }",
+                                                "value": "metadata.name",
+                                                "key": "metadata.name"
+                                            }
                                         }
                                     ]
                                 }
