@@ -69,7 +69,7 @@
                                             "required": true,
                                             "dynamicValuesDefinition": {
                                                 "operation": "core.Secrets",
-                                                "gqlQuery": "query ($namespace: String!) { core { Secrets(namespace: $namespace) { metadata { name } } } }",
+                                                "gqlQuery": "query ($namespace: String!) { core { Secrets(namespace: $namespace, labelSelector: \"apeirora.eu/llm-api-compatibility=openai\") { metadata { name } } } }",
                                                 "value": "metadata.name",
                                                 "key": "metadata.name"
                                             }
