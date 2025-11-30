@@ -1,6 +1,6 @@
 apiVersion: v2
 name: chat-ui-operator
-description: Operator that deploys Open WebUI for OpenAI-compatible backends
+description: Operator that deploys Chat UI for OpenAI-compatible backends
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
