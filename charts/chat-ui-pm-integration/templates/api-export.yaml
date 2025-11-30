@@ -5,6 +5,8 @@ metadata:
   labels:
     ui.platform-mesh.io/content-for: ui.privatellms.msp
 spec:
+  maximalPermissionPolicy:
+    local: {}
   permissionClaims:
     - group: ""
       resource: namespaces
