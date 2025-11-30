@@ -1,0 +1,37 @@
+{{- if .Values.ui.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-portal
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "chat-ui-ui.labels" . | nindent 4 }}
+    app.kubernetes.io/component: portal-ui
+  annotations:
+    {{- $annotations := merge (dict) (.Values.ingress.extraAnnotations | default dict) (.Values.ui.ingress.annotations | default dict) -}}
+    {{- if $annotations }}
+{{ toYaml $annotations | indent 4 }}
+    {{- end }}
+spec:
+  {{- if .Values.traefik.ingressClass.name }}
+  ingressClassName: {{ .Values.traefik.ingressClass.name }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.PUBLIC_HOST | quote }}
+      http:
+        paths:
+          - path: {{ .Values.ui.contentPath | default "/pm-content.json" | quote }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-portal
+                port:
+                  number: {{ .Values.ui.service.port }}
+  {{- if .Values.tls.secretName }}
+  tls:
+    - hosts:
+        - {{ .Values.PUBLIC_HOST | quote }}
+      secretName: {{ .Values.tls.secretName }}
+  {{- end }}
+{{- end }}
+

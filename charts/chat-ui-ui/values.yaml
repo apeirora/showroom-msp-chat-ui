@@ -1,0 +1,32 @@
+PUBLIC_HOST: "localhost"
+PUBLIC_SCHEME: "http"
+
+tls:
+  secretName: ""
+
+ingress:
+  extraAnnotations: {}
+
+traefik:
+  ingressClass:
+    name: ""
+
+imagePullSecrets: []
+
+ui:
+  enabled: true
+  contentPath: "/pm-content.json"
+  image:
+    repository: nginx
+    tag: "1.27"
+    pullPolicy: IfNotPresent
+  resources: {}
+  service:
+    type: ClusterIP
+    port: 80
+  ingress:
+    annotations: {}
+branding:
+  sidebar:
+    title: "Chat UI"
+

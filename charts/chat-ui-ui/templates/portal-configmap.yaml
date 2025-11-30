@@ -1,0 +1,14 @@
+{{- if .Values.ui.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-portal-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "chat-ui-ui.labels" . | nindent 4 }}
+    app.kubernetes.io/component: portal-ui
+data:
+  pm-content.json: |-
+{{ tpl (.Files.Get "files/pm-content.json") . | indent 4 }}
+{{- end }}
+
