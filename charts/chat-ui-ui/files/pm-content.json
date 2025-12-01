@@ -48,6 +48,11 @@
                                             "label": "Status",
                                             "property": "status.phase",
                                             "labelDisplay": true
+                                        },
+                                        {
+                                            "label": "URL",
+                                            "property": "status.url",
+                                            "labelDisplay": true
                                         }
                                     ]
                                 },
