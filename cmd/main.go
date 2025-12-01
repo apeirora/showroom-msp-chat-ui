@@ -126,7 +126,8 @@ func (c *labelingClient) Update(ctx context.Context, obj client.Object, opts ...
 	return c.Client.Update(ctx, obj, opts...)
 }
 
-func (c *labelingClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+func (c *labelingClient) Patch(ctx context.Context, obj client.Object, patch client.Patch,
+	opts ...client.PatchOption) error {
 	c.ensureLabels(obj)
 	return c.Client.Patch(ctx, obj, patch, opts...)
 }
@@ -146,8 +147,10 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election for controller manager.")
 	flag.BoolVar(&secureMetrics, "metrics-secure", false, "If set the metrics endpoint is served securely")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false, "If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.StringVar(&publicSchemeFlag, "public-scheme", "", "Public URL scheme for status.url (overrides PUBLIC_SCHEME env)")
-	flag.StringVar(&ingressExtraAnnotationsJSON, "ingress-extra-annotations", "", "JSON map of extra Ingress annotations to merge")
+	flag.StringVar(&publicSchemeFlag, "public-scheme", "",
+		"Public URL scheme for status.url (overrides PUBLIC_SCHEME env)")
+	flag.StringVar(&ingressExtraAnnotationsJSON, "ingress-extra-annotations", "",
+		"JSON map of extra Ingress annotations to merge")
 	flag.StringVar(&tlsSecretName, "tls-secret-name", "", "Secret name for Ingress TLS (optional)")
 
 	opts := zap.Options{Development: true}
