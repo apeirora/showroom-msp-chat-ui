@@ -1,0 +1,48 @@
+{{- if .Values.publishedResources.enabled }}
+{{- $ns := (.Values.publishedResources.namespace | default .Release.Namespace) }}
+apiVersion: syncagent.kcp.io/v1alpha1
+kind: PublishedResource
+metadata:
+  name: publish-chat-ui-instances
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: chat-ui-sync-agent
+    app.kubernetes.io/component: portal-integration
+spec:
+  resource:
+    kind: ChatUIInstance
+    apiGroup: ui.privatellms.msp
+    version: v1alpha1
+  naming:
+    namespace: "{{`{{ .ClusterName }}`}}"
+    name: "{{`{{ .Object.metadata.name }}`}}"
+{{- if .Values.publishedResources.credentialSecrets.enabled }}
+---
+apiVersion: syncagent.kcp.io/v1alpha1
+kind: PublishedResource
+metadata:
+  name: publish-chat-ui-credential-secrets
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: chat-ui-sync-agent
+    app.kubernetes.io/component: portal-integration
+spec:
+  resource:
+    apiGroup: ""
+    kind: Secret
+    version: v1
+  naming:
+    namespace: "{{`{{ .ClusterName }}`}}"
+    name: "{{`{{ .Object.metadata.name }}`}}"
+  filter:
+    resource:
+{{- with .Values.publishedResources.credentialSecrets.labelSelector }}
+{{ toYaml . | indent 6 }}
+{{- else }}
+      matchExpressions:
+        - key: llm.privatellms.msp/apitokenrequest
+          operator: Exists
+{{- end }}
+{{- end }}
+{{- end }}
+

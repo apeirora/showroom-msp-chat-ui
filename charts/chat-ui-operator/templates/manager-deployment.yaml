@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "chatui.fullname" . }}-controller-manager
+  labels:
+    app.kubernetes.io/name: chat-ui-operator
+spec:
+  replicas: {{ .Values.manager.replicas }}
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+      app.kubernetes.io/name: chat-ui-operator
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+        app.kubernetes.io/name: chat-ui-operator
+    spec:
+      serviceAccountName: {{ include "chatui.saName" . }}
+      containers:
+        - name: manager
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /manager
+          args:
+            - "--metrics-bind-address=:8080"
+            - "--health-probe-bind-address=:8081"
+          env:
+            - name: PUBLIC_HOST
+              value: {{ .Values.env.PUBLIC_HOST | quote }}
+            - name: PUBLIC_SCHEME
+              value: {{ .Values.env.PUBLIC_SCHEME | quote }}
+            - name: INGRESS_EXTRA_ANNOTATIONS
+              value: {{ .Values.env.INGRESS_EXTRA_ANNOTATIONS | quote }}
+            - name: TLS_SECRET_NAME
+              value: {{ .Values.env.TLS_SECRET_NAME | quote }}
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          ports:
+            - containerPort: 8080
+              name: metrics
+            - containerPort: 8081
+              name: healthz
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+          resources:
+            {{- toYaml .Values.manager.resources | nindent 12 }}
+      {{- with .Values.image.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      nodeSelector:
+        {{- toYaml .Values.manager.nodeSelector | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.manager.tolerations | nindent 8 }}
+      affinity:
+        {{- toYaml .Values.manager.affinity | nindent 8 }}
+
+

@@ -1,0 +1,19 @@
+{{- if .Values.metrics.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "chatui.fullname" . }}-controller-manager-metrics-service
+  labels:
+    control-plane: controller-manager
+spec:
+  type: {{ .Values.metrics.service.type }}
+  ports:
+    - name: https
+      port: {{ .Values.metrics.service.port }}
+      protocol: TCP
+      targetPort: metrics
+  selector:
+    control-plane: controller-manager
+{{- end }}
+
+
