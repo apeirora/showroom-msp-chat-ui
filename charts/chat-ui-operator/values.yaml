@@ -1,33 +1,26 @@
 image:
   repository: ghcr.io/apeirora/chat-ui-controller
-  tag: 0.1.0
+  tag: 0.2.0
   pullPolicy: IfNotPresent
   imagePullSecrets: []
-
 manager:
   replicas: 1
   resources: {}
   nodeSelector: {}
   tolerations: []
   affinity: {}
-
 env:
-  PUBLIC_HOST: "chat.localhost"
-  PUBLIC_SCHEME: "http"
-  INGRESS_EXTRA_ANNOTATIONS: "{}"
-  TLS_SECRET_NAME: ""
-
+  PUBLIC_HOST: chat.localhost
+  PUBLIC_SCHEME: http
+  INGRESS_EXTRA_ANNOTATIONS: '{}'
+  TLS_SECRET_NAME: ''
 rbac:
   create: true
-
 serviceAccount:
   create: true
-  name: ""
-
+  name: ''
 metrics:
   enabled: true
   service:
     type: ClusterIP
     port: 8080
-
-
