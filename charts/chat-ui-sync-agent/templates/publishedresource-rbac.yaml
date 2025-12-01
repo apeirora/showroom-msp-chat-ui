@@ -1,0 +1,49 @@
+{{- if .Values.publishedResources.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: api-syncagent:chatui
+  labels:
+    app.kubernetes.io/name: chat-ui-sync-agent
+    app.kubernetes.io/component: portal-integration
+rules:
+  - apiGroups:
+      - ui.privatellms.msp
+    resources:
+      - chatuiinstances
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: api-syncagent:chatui
+  labels:
+    app.kubernetes.io/name: chat-ui-sync-agent
+    app.kubernetes.io/component: portal-integration
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: api-syncagent:chatui
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.publishedResources.serviceAccountName | default .Release.Name }}
+    namespace: {{ .Values.publishedResources.namespace | default .Release.Namespace }}
+{{- end }}
+
+

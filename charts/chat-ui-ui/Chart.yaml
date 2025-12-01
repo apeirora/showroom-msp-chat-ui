@@ -1,0 +1,7 @@
+apiVersion: v2
+name: chat-ui-ui
+description: Expose the Chat UI Platform Mesh portal bundle (nginx + ingress)
+type: application
+version: 0.1.0
+appVersion: 0.1.0
+

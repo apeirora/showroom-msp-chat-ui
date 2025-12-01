@@ -1,0 +1,82 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: chatuiinstances.ui.privatellms.msp
+spec:
+  group: ui.privatellms.msp
+  names:
+    kind: ChatUIInstance
+    listKind: ChatUIInstanceList
+    plural: chatuiinstances
+    singular: chatuiinstance
+    shortNames:
+      - cui
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Secret
+          type: string
+          jsonPath: .spec.credentialsSecretRef.name
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: URL
+          type: string
+          jsonPath: .status.url
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required: ["credentialsSecretRef"]
+              properties:
+                credentialsSecretRef:
+                  type: object
+                  description: "Reference to a Secret containing OPENAI_API_URL and OPENAI_API_KEY"
+                  required: ["name"]
+                  properties:
+                    name:
+                      type: string
+                      minLength: 1
+                replicas:
+                  type: integer
+                  format: int32
+                  minimum: 0
+                  default: 1
+                image:
+                  type: string
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                url:
+                  type: string
+                observedGeneration:
+                  type: integer
+                  format: int64
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    required: ["type","status","lastTransitionTime","reason","message"]
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                      message:
+                        type: string
+
+
