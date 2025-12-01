@@ -100,6 +100,7 @@ jobs:
           - chat-ui-operator
           - chat-ui-sync-agent
           - chat-ui-pm-integration
+          - chat-ui-ui
     env:
       VERSION: ${{ needs.publish-image.outputs.version }}
       CHART_REGISTRY: ${{ needs.publish-image.outputs.chart_registry }}
@@ -199,13 +200,13 @@ jobs:
         run: |
           curl -sSfL https://ocm.software/install.sh | sudo bash
 
-      - name: Build and Push OCM component
-        run: |
-          mkdir -p dist/ctf
-          owner="${GITHUB_REPOSITORY_OWNER,,}"
-          ocm add componentversions --create --file dist/ctf .ocm/component-constructor.yaml \
-            VERSION="${VERSION}" GITHUB_REPOSITORY_OWNER="${owner}" IMAGE_TAG="${VERSION}" CHART_TAG="${VERSION}"
-          ocm transfer commontransportarchive dist/ctf "$OCM_REPOSITORY" --copy-resources --overwrite
+      # - name: Build and Push OCM component
+      #   run: |
+      #     mkdir -p dist/ctf
+      #     owner="${GITHUB_REPOSITORY_OWNER,,}"
+      #     ocm add componentversions --create --file dist/ctf .ocm/component-constructor.yaml \
+      #       VERSION="${VERSION}" GITHUB_REPOSITORY_OWNER="${owner}" IMAGE_TAG="${VERSION}" CHART_TAG="${VERSION}"
+      #     ocm transfer commontransportarchive dist/ctf "$OCM_REPOSITORY" --copy-resources --overwrite
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
