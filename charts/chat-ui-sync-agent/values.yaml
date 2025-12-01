@@ -1,0 +1,22 @@
+syncAgentOperator:
+  enabled: true
+  apiExportName: ui.privatellms.msp
+  agentName: chat-ui-agent
+  kcpKubeconfig: pm-kcp-kubeconfig
+  extraFlags: []
+  crds:
+    enabled: false
+
+publishedResources:
+  enabled: true
+  namespace: api-syncagent
+  serviceAccountName: chat-ui-sync-agent
+  credentialSecrets:
+    enabled: true
+    labelSelector:
+      matchExpressions:
+        - key: apeirora.eu/llm-api-compatibility
+          operator: In
+          values:
+            - openai
+

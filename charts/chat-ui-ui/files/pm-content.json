@@ -1,0 +1,111 @@
+{{- $sidebarTitle := .Values.branding.sidebar.title -}}
+{
+    "name": "chatuiinstances",
+    "creationTimestamp": "2024-01-01T00:00:00Z",
+    "luigiConfigFragment": {
+        "data": {
+            "nodes": [
+                {
+                    "pathSegment": "ui_privatellms_msp_chatuiinstances",
+                    "navigationContext": "ui_privatellms_msp_chatuiinstances",
+                    "label": "Chat UI Instances",
+                    "icon": "sap-icon://discussion",
+                    "category": {
+                        "label": {{ $sidebarTitle | quote }},
+                        "icon": "sap-icon://discussion",
+                        "collapsible": true,
+                        "order": 7
+                    },
+                    "entityType": "main.core_platform-mesh_io_account.core_namespace",
+                    "loadingIndicator": {
+                        "enabled": false
+                    },
+                    "keepSelectedForChildren": true,
+                    "url": "/assets/platform-mesh-portal-ui-wc.js#generic-list-view",
+                    "webcomponent": {
+                        "selfRegistered": true
+                    },
+                    "context": {
+                        "resourceDefinition": {
+                            "group": "ui.privatellms.msp",
+                            "plural": "chatuiinstances",
+                            "singular": "chatuiinstance",
+                            "kind": "ChatUIInstance",
+                            "scope": "Namespaced",
+                            "namespace": null,
+                            "ui": {
+                                "listView": {
+                                    "fields": [
+                                        {
+                                            "label": "Name",
+                                            "property": "metadata.name"
+                                        },
+                                        {
+                                            "label": "Replicas",
+                                            "property": "spec.replicas"
+                                        },
+                                        {
+                                            "label": "Status",
+                                            "property": "status.phase",
+                                            "labelDisplay": true
+                                        },
+                                        {
+                                            "label": "URL",
+                                            "property": "status.url",
+                                            "labelDisplay": true
+                                        }
+                                    ]
+                                },
+                                "createView": {
+                                    "fields": [
+                                        {
+                                            "label": "Name",
+                                            "property": "metadata.name",
+                                            "required": true
+                                        },
+                                        {
+                                            "label": "Replicas",
+                                            "property": "spec.replicas",
+                                            "defaultValue": 1
+                                        },
+                                        {
+                                            "label": "Credentials Secret",
+                                            "property": "spec.credentialsSecretRef.name",
+                                            "required": true,
+                                            "dynamicValuesDefinition": {
+                                                "operation": "core.Secrets",
+                                                "gqlQuery": "query ($namespace: String!) { core { Secrets(namespace: $namespace, labelselector: \"apeirora.eu/llm-api-compatibility=openai\") { metadata { name } } } }",
+                                                "value": "metadata.name",
+                                                "key": "metadata.name"
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "children": [
+                        {
+                            "pathSegment": ":instanceName",
+                            "hideFromNav": true,
+                            "keepSelectedForChildren": false,
+                            "defineEntity": {
+                                "id": "ui_privatellms_msp_chatuiinstance",
+                                "contextKey": "instanceName",
+                                "graphqlEntity": {
+                                    "group": "ui.privatellms.msp",
+                                    "kind": "ChatUIInstance",
+                                    "query": "{ metadata { name annotations } }"
+                                }
+                            },
+                            "context": {
+                                "instanceName": ":instanceName"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}
+

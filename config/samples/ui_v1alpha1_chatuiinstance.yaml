@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: llm-backend-sample
+  labels:
+    apeirora.eu/llm-api-compatibility: "openai"
+type: Opaque
+stringData:
+  OPENAI_API_URL: "https://your-openai-compatible-endpoint/v1"
+  OPENAI_API_KEY: "replace-me"
+---
+apiVersion: ui.privatellms.msp/v1alpha1
+kind: ChatUIInstance
+metadata:
+  name: chatui-sample
+spec:
+  credentialsSecretRef:
+    name: llm-backend-sample
+  replicas: 1
+
+

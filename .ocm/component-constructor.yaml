@@ -1,0 +1,19 @@
+name: ui.privatellms.msp/chat-ui
+version: ${VERSION}
+provider:
+  name: ${GITHUB_REPOSITORY_OWNER}
+
+resources:
+  - name: oci-helm-chart-chat-ui-operator
+    type: helmChart
+    version: "${VERSION}"
+    access:
+      type: ociArtifact
+      imageReference: ghcr.io/${GITHUB_REPOSITORY_OWNER}/charts/chat-ui-operator:${CHART_TAG}
+
+  - name: chat-ui-image
+    type: ociImage
+    version: "${VERSION}"
+    access:
+      type: ociArtifact
+      imageReference: ghcr.io/${GITHUB_REPOSITORY_OWNER}/chat-ui-controller:${IMAGE_TAG}
