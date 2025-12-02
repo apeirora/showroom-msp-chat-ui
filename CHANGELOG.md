@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.3.0...v0.4.0) (2025-12-02)
+
+
+### Features
+
+* add SVG chat icon and update metadata to use it ([#7](https://github.com/apeirora/showroom-msp-chat-ui/issues/7)) ([b25fb86](https://github.com/apeirora/showroom-msp-chat-ui/commit/b25fb867c3d66b3b5e00f79bf6ffdbba1ef5d74c))
+* dns tenants ([#5](https://github.com/apeirora/showroom-msp-chat-ui/issues/5)) ([0608d2c](https://github.com/apeirora/showroom-msp-chat-ui/commit/0608d2c908093c038aecfa80517c6d6cd84aecb7))
+
 ## [0.3.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.2.0...v0.3.0) (2025-12-01)
 
 
