@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"strings"
 	"time"
@@ -61,6 +60,7 @@ type ChatUIInstanceReconciler struct {
 
 const (
 	slugAnnotationKey = "ui.privatellms.msp/slug"
+	slugAlphabet      = "abcdefghijklmnopqrstuvwxyz0123456789"
 )
 
 //+kubebuilder:rbac:groups=ui.privatellms.msp,resources=chatuiinstances,verbs=get;list;watch;create;update;patch;delete
@@ -147,14 +147,18 @@ func (r *ChatUIInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
+	instanceHost, err := r.instanceHost(slug)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Reconcile Ingress
-	pathPrefix := fmt.Sprintf("/chat/%s", slug)
-	if err := r.reconcileIngress(ctx, inst, labels, svcName, pathPrefix); err != nil {
+	if err := r.reconcileIngress(ctx, inst, labels, svcName, instanceHost, "/"); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Update status
-	if err := r.updateInstanceStatus(ctx, inst, slug); err != nil {
+	if err := r.updateInstanceStatus(ctx, inst, instanceHost); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -193,10 +197,10 @@ func (r *ChatUIInstanceReconciler) ensureSlug(ctx context.Context, inst *uiapiv1
 	if anns != nil {
 		slug = strings.TrimSpace(anns[slugAnnotationKey])
 	}
-	if slug != "" {
+	if slug != "" && isValidSlug(slug) {
 		return slug, false, nil
 	}
-	newSlug, err := generateSlug(9)
+	newSlug, err := generateSlug(12)
 	if err != nil {
 		return "", false, err
 	}
@@ -431,7 +435,7 @@ func (r *ChatUIInstanceReconciler) reconcileService(ctx context.Context, inst *u
 	return nil
 }
 
-func (r *ChatUIInstanceReconciler) reconcileIngress(ctx context.Context, inst *uiapiv1alpha1.ChatUIInstance, labels map[string]string, svcName, pathPrefix string) error {
+func (r *ChatUIInstanceReconciler) reconcileIngress(ctx context.Context, inst *uiapiv1alpha1.ChatUIInstance, labels map[string]string, svcName, host, pathPrefix string) error {
 	logger := log.FromContext(ctx)
 	ingressName := svcName
 	var ing networkingv1.Ingress
@@ -440,7 +444,7 @@ func (r *ChatUIInstanceReconciler) reconcileIngress(ctx context.Context, inst *u
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
-		newIngress := r.buildDesiredIngress(inst, labels, svcName, pathPrefix)
+		newIngress := r.buildDesiredIngress(inst, labels, svcName, host, pathPrefix)
 		if err := ctrl.SetControllerReference(inst, newIngress, r.Scheme); err != nil {
 			return err
 		}
@@ -457,13 +461,16 @@ func (r *ChatUIInstanceReconciler) reconcileIngress(ctx context.Context, inst *u
 	if r.applyExtraIngressAnnotations(&ing, true) {
 		updated = true
 	}
+	if r.ensureIngressDNSAnnotation(&ing, host) {
+		updated = true
+	}
 	if r.ensureIngressClass(&ing) {
 		updated = true
 	}
-	if r.ensureIngressHTTPRule(&ing, pathPrefix, svcName) {
+	if r.ensureIngressHTTPRule(&ing, host, pathPrefix, svcName) {
 		updated = true
 	}
-	if r.ensureIngressTLS(&ing, isHTTPS) {
+	if r.ensureIngressTLS(&ing, host, isHTTPS) {
 		updated = true
 	}
 	if !updated {
@@ -472,7 +479,7 @@ func (r *ChatUIInstanceReconciler) reconcileIngress(ctx context.Context, inst *u
 	return r.Update(ctx, &ing)
 }
 
-func (r *ChatUIInstanceReconciler) buildDesiredIngress(inst *uiapiv1alpha1.ChatUIInstance, labels map[string]string, svcName, pathPrefix string) *networkingv1.Ingress {
+func (r *ChatUIInstanceReconciler) buildDesiredIngress(inst *uiapiv1alpha1.ChatUIInstance, labels map[string]string, svcName, host, pathPrefix string) *networkingv1.Ingress {
 	className := "traefik"
 	pathType := networkingv1.PathTypePrefix
 	isHTTPS := strings.EqualFold(r.PublicScheme, "https")
@@ -489,7 +496,7 @@ func (r *ChatUIInstanceReconciler) buildDesiredIngress(inst *uiapiv1alpha1.ChatU
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: &className,
 			Rules: []networkingv1.IngressRule{{
-				Host: r.PublicHost,
+				Host: host,
 				IngressRuleValue: networkingv1.IngressRuleValue{
 					HTTP: &networkingv1.HTTPIngressRuleValue{
 						Paths: []networkingv1.HTTPIngressPath{{
@@ -514,13 +521,14 @@ func (r *ChatUIInstanceReconciler) buildDesiredIngress(inst *uiapiv1alpha1.ChatU
 					return nil
 				}
 				return []networkingv1.IngressTLS{{
-					Hosts:      []string{r.PublicHost},
+					Hosts:      []string{host},
 					SecretName: desiredTLS,
 				}}
 			}(),
 		},
 	}
 	r.applyExtraIngressAnnotations(ingress, false)
+	r.ensureIngressDNSAnnotation(ingress, host)
 	return ingress
 }
 
@@ -575,6 +583,21 @@ func (r *ChatUIInstanceReconciler) applyExtraIngressAnnotations(ing *networkingv
 	return updated
 }
 
+func (r *ChatUIInstanceReconciler) ensureIngressDNSAnnotation(ing *networkingv1.Ingress, host string) bool {
+	if host == "" {
+		return false
+	}
+	if ing.Annotations == nil {
+		ing.Annotations = map[string]string{}
+	}
+	desired := host
+	if ing.Annotations["dns.gardener.cloud/dnsnames"] == desired {
+		return false
+	}
+	ing.Annotations["dns.gardener.cloud/dnsnames"] = desired
+	return true
+}
+
 func (r *ChatUIInstanceReconciler) ensureIngressClass(ing *networkingv1.Ingress) bool {
 	className := "traefik"
 	if ing.Spec.IngressClassName == nil || *ing.Spec.IngressClassName != className {
@@ -584,7 +607,7 @@ func (r *ChatUIInstanceReconciler) ensureIngressClass(ing *networkingv1.Ingress)
 	return false
 }
 
-func (r *ChatUIInstanceReconciler) ensureIngressHTTPRule(ing *networkingv1.Ingress, pathPrefix, svcName string) bool {
+func (r *ChatUIInstanceReconciler) ensureIngressHTTPRule(ing *networkingv1.Ingress, host, pathPrefix, svcName string) bool {
 	updated := false
 	pathType := networkingv1.PathTypePrefix
 	if len(ing.Spec.Rules) == 0 {
@@ -592,8 +615,8 @@ func (r *ChatUIInstanceReconciler) ensureIngressHTTPRule(ing *networkingv1.Ingre
 		updated = true
 	}
 	rule := &ing.Spec.Rules[0]
-	if rule.Host != r.PublicHost {
-		rule.Host = r.PublicHost
+	if rule.Host != host {
+		rule.Host = host
 		updated = true
 	}
 	if rule.HTTP == nil {
@@ -632,14 +655,14 @@ func (r *ChatUIInstanceReconciler) ensureIngressHTTPRule(ing *networkingv1.Ingre
 	return updated
 }
 
-func (r *ChatUIInstanceReconciler) ensureIngressTLS(ing *networkingv1.Ingress, isHTTPS bool) bool {
+func (r *ChatUIInstanceReconciler) ensureIngressTLS(ing *networkingv1.Ingress, host string, isHTTPS bool) bool {
 	desiredTLS := strings.TrimSpace(r.TLSSecretName)
 	if !isHTTPS || desiredTLS == "" {
 		return false
 	}
-	if len(ing.Spec.TLS) == 0 || ing.Spec.TLS[0].SecretName != desiredTLS || len(ing.Spec.TLS[0].Hosts) == 0 || ing.Spec.TLS[0].Hosts[0] != r.PublicHost {
+	if len(ing.Spec.TLS) == 0 || ing.Spec.TLS[0].SecretName != desiredTLS || len(ing.Spec.TLS[0].Hosts) == 0 || ing.Spec.TLS[0].Hosts[0] != host {
 		ing.Spec.TLS = []networkingv1.IngressTLS{{
-			Hosts:      []string{r.PublicHost},
+			Hosts:      []string{host},
 			SecretName: desiredTLS,
 		}}
 		return true
@@ -647,7 +670,7 @@ func (r *ChatUIInstanceReconciler) ensureIngressTLS(ing *networkingv1.Ingress, i
 	return false
 }
 
-func (r *ChatUIInstanceReconciler) updateInstanceStatus(ctx context.Context, inst *uiapiv1alpha1.ChatUIInstance, slug string) error {
+func (r *ChatUIInstanceReconciler) updateInstanceStatus(ctx context.Context, inst *uiapiv1alpha1.ChatUIInstance, host string) error {
 	readyCond := metav1.Condition{
 		Type:               "Ready",
 		Status:             metav1.ConditionTrue,
@@ -661,7 +684,7 @@ func (r *ChatUIInstanceReconciler) updateInstanceStatus(ctx context.Context, ins
 	if scheme == "" {
 		scheme = "http"
 	}
-	inst.Status.URL = fmt.Sprintf("%s://%s/chat/%s", scheme, r.PublicHost, slug)
+	inst.Status.URL = fmt.Sprintf("%s://%s", scheme, host)
 	inst.Status.ObservedGeneration = inst.Generation
 	return r.Status().Update(ctx, inst)
 }
@@ -675,30 +698,49 @@ func (r *ChatUIInstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func generateSlug(numBytes int) (string, error) {
-	b := make([]byte, numBytes)
-	if _, err := rand.Read(b); err != nil {
+func generateSlug(length int) (string, error) {
+	if length <= 0 {
+		return "", fmt.Errorf("slug length must be greater than zero")
+	}
+	randomBytes := make([]byte, length)
+	if _, err := rand.Read(randomBytes); err != nil {
 		return "", err
 	}
-	s := base64.RawURLEncoding.EncodeToString(b)
-	if len(s) > 16 {
-		s = s[:16]
+
+	alphabet := []byte(slugAlphabet)
+	slug := make([]byte, length)
+	for i, b := range randomBytes {
+		slug[i] = alphabet[int(b)%len(alphabet)]
 	}
-	if len(s) > 0 {
-		sb := []byte(s)
-		if !isAlphaNumeric(sb[0]) {
-			sb[0] = 'a'
-		}
-		if !isAlphaNumeric(sb[len(sb)-1]) {
-			sb[len(sb)-1] = 'z'
-		}
-		s = string(sb)
-	}
-	return s, nil
+	return string(slug), nil
 }
 
-func isAlphaNumeric(b byte) bool {
-	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
+func isValidSlug(slug string) bool {
+	if slug == "" || len(slug) > 63 {
+		return false
+	}
+	if slug[0] == '-' || slug[len(slug)-1] == '-' {
+		return false
+	}
+	for i := 0; i < len(slug); i++ {
+		c := slug[i]
+		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') {
+			continue
+		}
+		if c == '-' && i != 0 && i != len(slug)-1 {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func (r *ChatUIInstanceReconciler) instanceHost(slug string) (string, error) {
+	base := strings.TrimSpace(r.PublicHost)
+	if base == "" {
+		return "", fmt.Errorf("PUBLIC_HOST is not configured")
+	}
+	return fmt.Sprintf("%s.%s", slug, base), nil
 }
 
 func ptrTo[T any](v T) *T {
