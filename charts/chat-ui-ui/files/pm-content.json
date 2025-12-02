@@ -35,54 +35,53 @@
                             "scope": "Namespaced",
                             "namespace": null,
                             "ui": {
-                                    "logoUrl": "data:image/svg+xml;base64,{{$logo}}",
-                                    "listView": {
-                                        "fields": [
-                                            {
-                                                "label": "Name",
-                                                "property": "metadata.name"
-                                            },
-                                            {
-                                                "label": "Replicas",
-                                                "property": "spec.replicas"
-                                            },
-                                            {
-                                                "label": "Status",
-                                                "property": "status.phase",
-                                                "labelDisplay": true
-                                            },
-                                            {
-                                                "label": "URL",
-                                                "property": "status.url",
-                                                "labelDisplay": true
+                                "logoUrl": "data:image/svg+xml;base64,{{$logo}}",
+                                "listView": {
+                                    "fields": [
+                                        {
+                                            "label": "Name",
+                                            "property": "metadata.name"
+                                        },
+                                        {
+                                            "label": "Replicas",
+                                            "property": "spec.replicas"
+                                        },
+                                        {
+                                            "label": "Status",
+                                            "property": "status.phase",
+                                            "labelDisplay": true
+                                        },
+                                        {
+                                            "label": "URL",
+                                            "property": "status.url",
+                                            "labelDisplay": true
+                                        }
+                                    ]
+                                },
+                                "createView": {
+                                    "fields": [
+                                        {
+                                            "label": "Name",
+                                            "property": "metadata.name",
+                                            "required": true
+                                        },
+                                        {
+                                            "label": "Replicas",
+                                            "property": "spec.replicas",
+                                            "defaultValue": 1
+                                        },
+                                        {
+                                            "label": "Credentials Secret",
+                                            "property": "spec.credentialsSecretRef.name",
+                                            "required": true,
+                                            "dynamicValuesDefinition": {
+                                                "operation": "core.Secrets",
+                                                "gqlQuery": "query ($namespace: String!) { core { Secrets(namespace: $namespace, labelselector: \"apeirora.eu/llm-api-compatibility=openai\") { metadata { name } } } }",
+                                                "value": "metadata.name",
+                                                "key": "metadata.name"
                                             }
-                                        ]
-                                    },
-                                    "createView": {
-                                        "fields": [
-                                            {
-                                                "label": "Name",
-                                                "property": "metadata.name",
-                                                "required": true
-                                            },
-                                            {
-                                                "label": "Replicas",
-                                                "property": "spec.replicas",
-                                                "defaultValue": 1
-                                            },
-                                            {
-                                                "label": "Credentials Secret",
-                                                "property": "spec.credentialsSecretRef.name",
-                                                "required": true,
-                                                "dynamicValuesDefinition": {
-                                                    "operation": "core.Secrets",
-                                                    "gqlQuery": "query ($namespace: String!) { core { Secrets(namespace: $namespace, labelselector: \"apeirora.eu/llm-api-compatibility=openai\") { metadata { name } } } }",
-                                                    "value": "metadata.name",
-                                                    "key": "metadata.name"
-                                                }
-                                            }
-                                        ]
-                                    }
+                                        }
+                                    ]
                                 }
                             }
                         }
