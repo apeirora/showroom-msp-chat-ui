@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.4.1...v0.4.2) (2026-01-29)
+
+
+### Bug Fixes
+
+* **pm-integration:** add RBAC for sync-agent virtual workspace access ([0d6dc25](https://github.com/apeirora/showroom-msp-chat-ui/commit/0d6dc25520eaab2b2b94bc0949c0d9018b313d50))
+
 ## [0.4.1](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.4.0...v0.4.1) (2025-12-02)
 
 
