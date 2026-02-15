@@ -19,7 +19,10 @@ package controller
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -35,7 +38,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
@@ -59,8 +64,9 @@ type ChatUIInstanceReconciler struct {
 }
 
 const (
-	slugAnnotationKey = "ui.privatellms.msp/slug"
-	slugAlphabet      = "abcdefghijklmnopqrstuvwxyz0123456789"
+	slugAnnotationKey        = "ui.privatellms.msp/slug"
+	secretChecksumAnnotation = "ui.privatellms.msp/secret-checksum"
+	slugAlphabet             = "abcdefghijklmnopqrstuvwxyz0123456789"
 )
 
 //+kubebuilder:rbac:groups=ui.privatellms.msp,resources=chatuiinstances,verbs=get;list;watch;create;update;patch;delete
@@ -105,7 +111,8 @@ func (r *ChatUIInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	// Validate secret reference
-	if strings.TrimSpace(inst.Spec.CredentialsSecretRef.Name) == "" {
+	secretName := strings.TrimSpace(inst.Spec.CredentialsSecretRef.Name)
+	if secretName == "" {
 		meta.SetStatusCondition(&inst.Status.Conditions, metav1.Condition{
 			Type: "Ready", Status: metav1.ConditionFalse, Reason: "MissingSecret",
 			Message:            "spec.credentialsSecretRef.name must point to a Secret with OPENAI_API_URL and OPENAI_API_KEY",
@@ -116,6 +123,25 @@ func (r *ChatUIInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		logger.Info("backend secret name is not set")
 		return ctrl.Result{}, nil
 	}
+
+	// Fetch the credentials secret and compute checksum for rollout detection
+	var credentialsSecret corev1.Secret
+	secretKey := client.ObjectKey{Namespace: inst.Namespace, Name: secretName}
+	if err := r.Get(ctx, secretKey, &credentialsSecret); err != nil {
+		if apierrors.IsNotFound(err) {
+			meta.SetStatusCondition(&inst.Status.Conditions, metav1.Condition{
+				Type: "Ready", Status: metav1.ConditionFalse, Reason: "SecretNotFound",
+				Message:            fmt.Sprintf("Secret %q not found", secretName),
+				LastTransitionTime: metav1.NewTime(time.Now()),
+			})
+			inst.Status.Phase = "Error"
+			_ = r.Status().Update(ctx, inst)
+			logger.Info("credentials secret not found", "secret", secretName)
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		}
+		return ctrl.Result{}, err
+	}
+	secretChecksum := computeSecretChecksum(&credentialsSecret)
 
 	// Ensure slug
 	slug, requeue, err := r.ensureSlug(ctx, inst)
@@ -137,7 +163,7 @@ func (r *ChatUIInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	// Reconcile Deployment
-	if err := r.reconcileDeployment(ctx, inst, labels, replicas, image); err != nil {
+	if err := r.reconcileDeployment(ctx, inst, labels, replicas, image, secretChecksum); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -222,7 +248,7 @@ func uiLabels(instanceName string) map[string]string {
 	}
 }
 
-func (r *ChatUIInstanceReconciler) reconcileDeployment(ctx context.Context, inst *uiapiv1alpha1.ChatUIInstance, labels map[string]string, replicas int32, image string) error {
+func (r *ChatUIInstanceReconciler) reconcileDeployment(ctx context.Context, inst *uiapiv1alpha1.ChatUIInstance, labels map[string]string, replicas int32, image string, secretChecksum string) error {
 	logger := log.FromContext(ctx)
 	deployName := fmt.Sprintf("%s-chatui", inst.Name)
 
@@ -232,7 +258,7 @@ func (r *ChatUIInstanceReconciler) reconcileDeployment(ctx context.Context, inst
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
-		deploy := buildDeployment(inst, labels, replicas, image)
+		deploy := buildDeployment(inst, labels, replicas, image, secretChecksum)
 		if err := ctrl.SetControllerReference(inst, &deploy, r.Scheme); err != nil {
 			return err
 		}
@@ -243,6 +269,24 @@ func (r *ChatUIInstanceReconciler) reconcileDeployment(ctx context.Context, inst
 		return nil
 	}
 	updated := false
+
+	// Check if checksum annotation needs update (triggers pod rollout)
+	currentChecksum := ""
+	if existing.Spec.Template.Annotations != nil {
+		currentChecksum = existing.Spec.Template.Annotations[secretChecksumAnnotation]
+	}
+	if currentChecksum != secretChecksum {
+		if existing.Spec.Template.Annotations == nil {
+			existing.Spec.Template.Annotations = map[string]string{}
+		}
+		existing.Spec.Template.Annotations[secretChecksumAnnotation] = secretChecksum
+		updated = true
+		logger.Info("secret checksum changed, triggering rollout",
+			"deployment", deployName,
+			"oldChecksum", currentChecksum,
+			"newChecksum", secretChecksum)
+	}
+
 	if existing.Spec.Replicas == nil || *existing.Spec.Replicas != replicas {
 		existing.Spec.Replicas = ptrTo(replicas)
 		updated = true
@@ -263,7 +307,7 @@ func (r *ChatUIInstanceReconciler) reconcileDeployment(ctx context.Context, inst
 	return r.Update(ctx, &existing)
 }
 
-func buildDeployment(inst *uiapiv1alpha1.ChatUIInstance, labels map[string]string, replicas int32, image string) appsv1.Deployment {
+func buildDeployment(inst *uiapiv1alpha1.ChatUIInstance, labels map[string]string, replicas int32, image string, secretChecksum string) appsv1.Deployment {
 	secretName := inst.Spec.CredentialsSecretRef.Name
 	envVars := []corev1.EnvVar{
 		// Core auth + connector settings
@@ -391,7 +435,12 @@ func buildDeployment(inst *uiapiv1alpha1.ChatUIInstance, labels map[string]strin
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{MatchLabels: copyStringMap(labels)},
 			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: copyStringMap(labels)},
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: copyStringMap(labels),
+					Annotations: map[string]string{
+						secretChecksumAnnotation: secretChecksum,
+					},
+				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{container},
 				},
@@ -695,7 +744,59 @@ func (r *ChatUIInstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&networkingv1.Ingress{}).
+		Watches(
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(r.findChatUIInstancesForSecret),
+		).
 		Complete(r)
+}
+
+// findChatUIInstancesForSecret returns reconcile requests for all ChatUIInstances
+// that reference the given Secret via credentialsSecretRef.
+func (r *ChatUIInstanceReconciler) findChatUIInstancesForSecret(ctx context.Context, obj client.Object) []reconcile.Request {
+	secret, ok := obj.(*corev1.Secret)
+	if !ok {
+		return nil
+	}
+
+	var instances uiapiv1alpha1.ChatUIInstanceList
+	if err := r.List(ctx, &instances, client.InNamespace(secret.Namespace)); err != nil {
+		return nil
+	}
+
+	var requests []reconcile.Request
+	for _, inst := range instances.Items {
+		if strings.TrimSpace(inst.Spec.CredentialsSecretRef.Name) == secret.Name {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      inst.Name,
+					Namespace: inst.Namespace,
+				},
+			})
+		}
+	}
+	return requests
+}
+
+// computeSecretChecksum returns a SHA256 hash of the Secret's data.
+// It sorts keys to ensure deterministic output.
+func computeSecretChecksum(secret *corev1.Secret) string {
+	if secret == nil || len(secret.Data) == 0 {
+		return ""
+	}
+
+	keys := make([]string, 0, len(secret.Data))
+	for k := range secret.Data {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	h := sha256.New()
+	for _, k := range keys {
+		h.Write([]byte(k))
+		h.Write(secret.Data[k])
+	}
+	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 
 func generateSlug(length int) (string, error) {
