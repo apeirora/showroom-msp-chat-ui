@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.4.3...v0.5.0) (2026-02-15)
+
+
+### Features
+
+* **ui:** display Chat UI URL as clickable link ([#12](https://github.com/apeirora/showroom-msp-chat-ui/issues/12)) ([bc66cd8](https://github.com/apeirora/showroom-msp-chat-ui/commit/bc66cd8b1613fa11a84de9786c2dcc59939bb629))
+
 ## [0.4.3](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.4.2...v0.4.3) (2026-02-15)
 
 
