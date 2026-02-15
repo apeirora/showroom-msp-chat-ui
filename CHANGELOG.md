@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.4.2...v0.4.3) (2026-02-15)
+
+
+### Bug Fixes
+
+* trigger pod rollout when credentials secret changes ([#10](https://github.com/apeirora/showroom-msp-chat-ui/issues/10)) ([4a9eddc](https://github.com/apeirora/showroom-msp-chat-ui/commit/4a9eddc95c54fdff49d5c9f07ab2c1e186f8337b))
+
 ## [0.4.2](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.4.1...v0.4.2) (2026-01-29)
 
 
