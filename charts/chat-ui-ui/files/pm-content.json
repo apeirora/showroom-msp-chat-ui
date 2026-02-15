@@ -54,7 +54,9 @@
                                         {
                                             "label": "URL",
                                             "property": "status.url",
-                                            "labelDisplay": true
+                                            "uiSettings": {
+                                                "displayAs": "link"
+                                            }
                                         }
                                     ]
                                 },
@@ -110,4 +112,3 @@
         }
     }
 }
-
