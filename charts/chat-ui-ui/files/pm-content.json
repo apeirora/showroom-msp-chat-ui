@@ -17,7 +17,7 @@
                         "collapsible": true,
                         "order": 7
                     },
-                    "entityType": "main.core_platform-mesh_io_account.core_namespace",
+                    "entityType": "main.core_platform-mesh_io_account.namespace",
                     "loadingIndicator": {
                         "enabled": false
                     },
@@ -29,7 +29,8 @@
                     "context": {
                         "resourceDefinition": {
                             "group": "ui.privatellms.msp",
-                            "plural": "chatuiinstances",
+                            "version": "v1alpha1",
+                            "plural": "ChatUIInstances",
                             "singular": "chatuiinstance",
                             "kind": "ChatUIInstance",
                             "scope": "Namespaced",
@@ -76,12 +77,7 @@
                                             "label": "Credentials Secret",
                                             "property": "spec.credentialsSecretRef.name",
                                             "required": true,
-                                            "dynamicValuesDefinition": {
-                                                "operation": "core.Secrets",
-                                                "gqlQuery": "query ($namespace: String!) { core { Secrets(namespace: $namespace, labelselector: \"apeirora.eu/llm-api-compatibility=openai\") { metadata { name } } } }",
-                                                "value": "metadata.name",
-                                                "key": "metadata.name"
-                                            }
+                                            "description": "Existing Secret name in this namespace"
                                         }
                                     ]
                                 }
@@ -98,6 +94,7 @@
                                 "contextKey": "instanceName",
                                 "graphqlEntity": {
                                     "group": "ui.privatellms.msp",
+                                    "version": "v1alpha1",
                                     "kind": "ChatUIInstance",
                                     "query": "{ metadata { name annotations } }"
                                 }
