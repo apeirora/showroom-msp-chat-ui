@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.1](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.5.0...v0.5.1) (2026-02-17)
+
+
+### Bug Fixes
+
+* **chart:** sync chat-ui credential secret from kcp ([7425611](https://github.com/apeirora/showroom-msp-chat-ui/commit/74256113c489d806b277bc685ad40742ccb13b49))
+* **core:** Restore ChatUI Credentials Secret dropdown ([49b49fb](https://github.com/apeirora/showroom-msp-chat-ui/commit/49b49fb795fe2305a41a6a94fda791b412a05fc6))
+* **sync-agent:** sync chat-ui credential secret from kcp ([1406d17](https://github.com/apeirora/showroom-msp-chat-ui/commit/1406d175db8c9f6187555673dbc74fd6e6feabc5))
+* **ui:** add versioned Chat UI pm-content schema metadata ([623d9a2](https://github.com/apeirora/showroom-msp-chat-ui/commit/623d9a21443ab88e4a6deddd45cb66a438e10d34))
+* **ui:** restore Credentials Secret dropdown for ChatUI create form ([ecc7dfb](https://github.com/apeirora/showroom-msp-chat-ui/commit/ecc7dfbed45d68c16ba06d836a6711c0d678309b))
+
 ## [0.5.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.4.3...v0.5.0) (2026-02-15)
 
 
