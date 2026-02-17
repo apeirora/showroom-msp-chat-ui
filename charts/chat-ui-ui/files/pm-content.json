@@ -77,7 +77,13 @@
                                             "label": "Credentials Secret",
                                             "property": "spec.credentialsSecretRef.name",
                                             "required": true,
-                                            "description": "Existing Secret name in this namespace"
+                                            "description": "Existing Secret name in this namespace",
+                                            "dynamicValuesDefinition": {
+                                                "operation": "v1.Secrets.items",
+                                                "gqlQuery": "query ($namespace: String!) { v1 { Secrets(namespace: $namespace, labelselector: \"apeirora.eu/llm-api-compatibility=openai\") { items { metadata { name } } } } }",
+                                                "value": "metadata.name",
+                                                "key": "metadata.name"
+                                            }
                                         }
                                     ]
                                 }
