@@ -13,10 +13,3 @@ publishedResources:
   serviceAccountName: chat-ui-sync-agent
   credentialSecrets:
     enabled: true
-    labelSelector:
-      matchExpressions:
-        - key: apeirora.eu/llm-api-compatibility
-          operator: In
-          values:
-            - openai
-
