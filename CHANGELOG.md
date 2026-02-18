@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.5.1...v0.5.2) (2026-02-18)
+
+
+### Bug Fixes
+
+* update APIExport apiVersion to v1alpha2 ([#17](https://github.com/apeirora/showroom-msp-chat-ui/issues/17)) ([02bccc9](https://github.com/apeirora/showroom-msp-chat-ui/commit/02bccc90e0e7f4c7d177a38649c2175cf223be75))
+
 ## [0.5.1](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.5.0...v0.5.1) (2026-02-17)
 
 
