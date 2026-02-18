@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.4](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.5.3...v0.5.4) (2026-02-18)
+
+
+### Bug Fixes
+
+* add required verbs field to v1alpha2 permissionClaims ([#21](https://github.com/apeirora/showroom-msp-chat-ui/issues/21)) ([7ea3c44](https://github.com/apeirora/showroom-msp-chat-ui/commit/7ea3c4423258ab9795316d1ab304ea6b67128cea))
+
 ## [0.5.3](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.5.2...v0.5.3) (2026-02-18)
 
 
