@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.3](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.5.2...v0.5.3) (2026-02-18)
+
+
+### Bug Fixes
+
+* remove v1alpha1 'all' field from permissionClaims ([#19](https://github.com/apeirora/showroom-msp-chat-ui/issues/19)) ([ec0d337](https://github.com/apeirora/showroom-msp-chat-ui/commit/ec0d3373b9d29e24c48caa1cf9f91ffa81e4df8d))
+
 ## [0.5.2](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.5.1...v0.5.2) (2026-02-18)
 
 
