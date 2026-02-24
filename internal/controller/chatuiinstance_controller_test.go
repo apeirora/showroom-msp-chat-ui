@@ -16,35 +16,41 @@ import (
 	uiapiv1alpha1 "github.com/example/chat-ui/api/v1alpha1"
 )
 
+const (
+	testNamespace               = "default"
+	testChatUIServiceName       = "demo-chatui"
+	reasonDeploymentProgressing = "DeploymentProgressing"
+)
+
 func TestEvaluateInstanceReadiness(t *testing.T) {
 	t.Run("reports deployment progressing when status is stale", func(t *testing.T) {
 		inst := &uiapiv1alpha1.ChatUIInstance{
-			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: testNamespace},
 		}
-		deploy := readyChatUIDeployment("demo-chatui", "default", 1)
+		deploy := readyChatUIDeployment()
 		deploy.Status.ObservedGeneration = 0
 
 		r := newChatUITestReconciler(nil, deploy)
-		ready, reason, _, err := r.evaluateInstanceReadiness(context.Background(), inst, "demo-chatui")
+		ready, reason, _, err := r.evaluateInstanceReadiness(context.Background(), inst, testChatUIServiceName)
 		if err != nil {
 			t.Fatalf("evaluateInstanceReadiness returned error: %v", err)
 		}
 		if ready {
 			t.Fatalf("expected instance to be not ready")
 		}
-		if reason != "DeploymentProgressing" {
-			t.Fatalf("expected reason DeploymentProgressing, got %q", reason)
+		if reason != reasonDeploymentProgressing {
+			t.Fatalf("expected reason %s, got %q", reasonDeploymentProgressing, reason)
 		}
 	})
 
 	t.Run("reports missing endpoints when deployment is ready", func(t *testing.T) {
 		inst := &uiapiv1alpha1.ChatUIInstance{
-			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: testNamespace},
 		}
-		deploy := readyChatUIDeployment("demo-chatui", "default", 1)
+		deploy := readyChatUIDeployment()
 
 		r := newChatUITestReconciler(nil, deploy)
-		ready, reason, _, err := r.evaluateInstanceReadiness(context.Background(), inst, "demo-chatui")
+		ready, reason, _, err := r.evaluateInstanceReadiness(context.Background(), inst, testChatUIServiceName)
 		if err != nil {
 			t.Fatalf("evaluateInstanceReadiness returned error: %v", err)
 		}
@@ -58,16 +64,16 @@ func TestEvaluateInstanceReadiness(t *testing.T) {
 
 	t.Run("reports health check failure when service probe fails", func(t *testing.T) {
 		inst := &uiapiv1alpha1.ChatUIInstance{
-			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: testNamespace},
 		}
-		deploy := readyChatUIDeployment("demo-chatui", "default", 1)
-		endpoints := readyServiceEndpoints("demo-chatui", "default", 8080)
+		deploy := readyChatUIDeployment()
+		endpoints := readyServiceEndpoints(8080)
 
 		r := newChatUITestReconciler(func(_ context.Context, _ string) error {
 			return errors.New("probe failed")
 		}, deploy, endpoints)
 
-		ready, reason, _, err := r.evaluateInstanceReadiness(context.Background(), inst, "demo-chatui")
+		ready, reason, _, err := r.evaluateInstanceReadiness(context.Background(), inst, testChatUIServiceName)
 		if err != nil {
 			t.Fatalf("evaluateInstanceReadiness returned error: %v", err)
 		}
@@ -81,14 +87,14 @@ func TestEvaluateInstanceReadiness(t *testing.T) {
 
 	t.Run("marks ready when deployment, endpoints, and probe are healthy", func(t *testing.T) {
 		inst := &uiapiv1alpha1.ChatUIInstance{
-			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: testNamespace},
 		}
-		deploy := readyChatUIDeployment("demo-chatui", "default", 1)
-		endpoints := readyServiceEndpoints("demo-chatui", "default", 8080)
+		deploy := readyChatUIDeployment()
+		endpoints := readyServiceEndpoints(8080)
 
 		r := newChatUITestReconciler(func(_ context.Context, _ string) error { return nil }, deploy, endpoints)
 
-		ready, reason, _, err := r.evaluateInstanceReadiness(context.Background(), inst, "demo-chatui")
+		ready, reason, _, err := r.evaluateInstanceReadiness(context.Background(), inst, testChatUIServiceName)
 		if err != nil {
 			t.Fatalf("evaluateInstanceReadiness returned error: %v", err)
 		}
@@ -135,11 +141,12 @@ func newChatUITestReconciler(checker ServiceHealthChecker, objects ...client.Obj
 	}
 }
 
-func readyChatUIDeployment(name, namespace string, replicas int32) *appsv1.Deployment {
+func readyChatUIDeployment() *appsv1.Deployment {
+	replicas := int32(1)
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:       name,
-			Namespace:  namespace,
+			Name:       testChatUIServiceName,
+			Namespace:  testNamespace,
 			Generation: 1,
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -154,11 +161,11 @@ func readyChatUIDeployment(name, namespace string, replicas int32) *appsv1.Deplo
 	}
 }
 
-func readyServiceEndpoints(name, namespace string, port int32) *corev1.Endpoints {
+func readyServiceEndpoints(port int32) *corev1.Endpoints {
 	return &corev1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:      testChatUIServiceName,
+			Namespace: testNamespace,
 		},
 		Subsets: []corev1.EndpointSubset{{
 			Addresses: []corev1.EndpointAddress{{IP: "10.0.0.10"}},

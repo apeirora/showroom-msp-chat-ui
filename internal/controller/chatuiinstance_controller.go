@@ -852,7 +852,9 @@ func defaultServiceHealthChecker(ctx context.Context, targetURL string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
 		return fmt.Errorf("unexpected status code %d", resp.StatusCode)
 	}
