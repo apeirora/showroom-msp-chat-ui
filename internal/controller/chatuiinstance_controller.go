@@ -22,6 +22,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -61,19 +62,26 @@ type ChatUIInstanceReconciler struct {
 	ExtraIngressAnnotations map[string]string
 	// TLSSecretName, when non-empty, configures spec.tls with this secret for PublicHost.
 	TLSSecretName string
+	// ServiceHealthChecker probes service endpoints before publishing Ready=True.
+	// If nil, a default HTTP checker is used.
+	ServiceHealthChecker ServiceHealthChecker
 }
 
 const (
 	slugAnnotationKey        = "ui.privatellms.msp/slug"
 	secretChecksumAnnotation = "ui.privatellms.msp/secret-checksum"
 	slugAlphabet             = "abcdefghijklmnopqrstuvwxyz0123456789"
+	provisioningRequeueAfter = 5 * time.Second
 )
+
+type ServiceHealthChecker func(ctx context.Context, targetURL string) error
 
 //+kubebuilder:rbac:groups=ui.privatellms.msp,resources=chatuiinstances,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=ui.privatellms.msp,resources=chatuiinstances/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=ui.privatellms.msp,resources=chatuiinstances/finalizers,verbs=update
 // core + apps
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=endpoints,verbs=get;list;watch
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
@@ -183,8 +191,20 @@ func (r *ChatUIInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	// Update status
-	if err := r.updateInstanceStatus(ctx, inst, instanceHost); err != nil {
+	ready, reason, message, err := r.evaluateInstanceReadiness(ctx, inst, svcName)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if !ready {
+		if err := r.updateProvisioningStatus(ctx, inst, instanceHost, reason, message); err != nil {
+			return ctrl.Result{}, err
+		}
+		logger.Info("ChatUIInstance is still provisioning", "name", req.NamespacedName, "reason", reason)
+		return ctrl.Result{RequeueAfter: provisioningRequeueAfter}, nil
+	}
+
+	// Update status to Ready only after health checks pass
+	if err := r.updateReadyStatus(ctx, inst, instanceHost); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -298,6 +318,9 @@ func (r *ChatUIInstanceReconciler) reconcileDeployment(ctx context.Context, inst
 		}
 		if c.Image != image {
 			c.Image = image
+			updated = true
+		}
+		if ensureChatUIContainerProbes(c) {
 			updated = true
 		}
 	}
@@ -424,6 +447,29 @@ func buildDeployment(inst *uiapiv1alpha1.ChatUIInstance, labels map[string]strin
 		Image: image,
 		Env:   envVars,
 		Ports: []corev1.ContainerPort{{ContainerPort: 8080, Protocol: corev1.ProtocolTCP}},
+		ReadinessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/",
+					Port: intstr.FromInt(8080),
+				},
+			},
+			PeriodSeconds:    5,
+			TimeoutSeconds:   2,
+			FailureThreshold: 6,
+		},
+		LivenessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/",
+					Port: intstr.FromInt(8080),
+				},
+			},
+			InitialDelaySeconds: 20,
+			PeriodSeconds:       10,
+			TimeoutSeconds:      2,
+			FailureThreshold:    6,
+		},
 	}
 	return appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -719,23 +765,139 @@ func (r *ChatUIInstanceReconciler) ensureIngressTLS(ing *networkingv1.Ingress, h
 	return false
 }
 
-func (r *ChatUIInstanceReconciler) updateInstanceStatus(ctx context.Context, inst *uiapiv1alpha1.ChatUIInstance, host string) error {
+func (r *ChatUIInstanceReconciler) evaluateInstanceReadiness(ctx context.Context, inst *uiapiv1alpha1.ChatUIInstance, svcName string) (bool, string, string, error) {
+	deployName := fmt.Sprintf("%s-chatui", inst.Name)
+	var deploy appsv1.Deployment
+	if err := r.Get(ctx, client.ObjectKey{Namespace: inst.Namespace, Name: deployName}, &deploy); err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, "DeploymentNotFound", fmt.Sprintf("Deployment %q not found", deployName), nil
+		}
+		return false, "", "", err
+	}
+
+	desiredReplicas := int32(1)
+	if deploy.Spec.Replicas != nil && *deploy.Spec.Replicas > 0 {
+		desiredReplicas = *deploy.Spec.Replicas
+	}
+
+	if deploy.Status.ObservedGeneration < deploy.Generation {
+		return false, "DeploymentProgressing", fmt.Sprintf("Deployment %q has not observed latest generation", deployName), nil
+	}
+	if deploy.Status.UpdatedReplicas < desiredReplicas {
+		return false, "DeploymentProgressing", fmt.Sprintf("Deployment %q updated replicas %d/%d", deployName, deploy.Status.UpdatedReplicas, desiredReplicas), nil
+	}
+	if deploy.Status.ReadyReplicas < desiredReplicas {
+		return false, "DeploymentNotReady", fmt.Sprintf("Deployment %q ready replicas %d/%d", deployName, deploy.Status.ReadyReplicas, desiredReplicas), nil
+	}
+	if deploy.Status.AvailableReplicas < desiredReplicas {
+		return false, "DeploymentNotAvailable", fmt.Sprintf("Deployment %q available replicas %d/%d", deployName, deploy.Status.AvailableReplicas, desiredReplicas), nil
+	}
+
+	endpointsReady, message, err := r.serviceHasReadyEndpoints(ctx, inst.Namespace, svcName, 8080)
+	if err != nil {
+		return false, "", "", err
+	}
+	if !endpointsReady {
+		return false, "ServiceEndpointsMissing", message, nil
+	}
+
+	probeURL := r.serviceProbeURL(inst.Namespace, svcName, 8080, "/")
+	if err := r.runServiceHealthCheck(ctx, probeURL); err != nil {
+		return false, "HealthCheckFailed", fmt.Sprintf("Service probe failed for %s: %v", probeURL, err), nil
+	}
+	return true, "Provisioned", "Chat UI is ready", nil
+}
+
+func (r *ChatUIInstanceReconciler) serviceHasReadyEndpoints(ctx context.Context, namespace, serviceName string, expectedPort int32) (bool, string, error) {
+	var endpoints corev1.Endpoints
+	if err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: serviceName}, &endpoints); err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, fmt.Sprintf("Endpoints for Service %q not found", serviceName), nil
+		}
+		return false, "", err
+	}
+	for _, subset := range endpoints.Subsets {
+		if len(subset.Addresses) == 0 {
+			continue
+		}
+		for _, port := range subset.Ports {
+			if port.Port == expectedPort {
+				return true, "", nil
+			}
+		}
+	}
+	return false, fmt.Sprintf("Service %q has no ready endpoints on port %d", serviceName, expectedPort), nil
+}
+
+func (r *ChatUIInstanceReconciler) serviceProbeURL(namespace, serviceName string, port int32, path string) string {
+	return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d%s", serviceName, namespace, port, path)
+}
+
+func (r *ChatUIInstanceReconciler) runServiceHealthCheck(ctx context.Context, targetURL string) error {
+	checker := r.ServiceHealthChecker
+	if checker == nil {
+		checker = defaultServiceHealthChecker
+	}
+	probeCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	return checker(probeCtx, targetURL)
+}
+
+func defaultServiceHealthChecker(ctx context.Context, targetURL string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
+		return fmt.Errorf("unexpected status code %d", resp.StatusCode)
+	}
+	return nil
+}
+
+func (r *ChatUIInstanceReconciler) updateProvisioningStatus(ctx context.Context, inst *uiapiv1alpha1.ChatUIInstance, host, reason, message string) error {
+	cond := metav1.Condition{
+		Type:               "Ready",
+		Status:             metav1.ConditionFalse,
+		ObservedGeneration: inst.Generation,
+		Reason:             reason,
+		Message:            message,
+	}
+	meta.SetStatusCondition(&inst.Status.Conditions, cond)
+	inst.Status.Phase = "Provisioning"
+	inst.Status.URL = r.instanceURL(host)
+	inst.Status.ObservedGeneration = inst.Generation
+	return r.Status().Update(ctx, inst)
+}
+
+func (r *ChatUIInstanceReconciler) updateReadyStatus(ctx context.Context, inst *uiapiv1alpha1.ChatUIInstance, host string) error {
 	readyCond := metav1.Condition{
 		Type:               "Ready",
 		Status:             metav1.ConditionTrue,
-		LastTransitionTime: metav1.NewTime(time.Now()),
+		ObservedGeneration: inst.Generation,
 		Reason:             "Provisioned",
 		Message:            "Chat UI is ready",
 	}
 	meta.SetStatusCondition(&inst.Status.Conditions, readyCond)
 	inst.Status.Phase = "Ready"
+	inst.Status.URL = r.instanceURL(host)
+	inst.Status.ObservedGeneration = inst.Generation
+	return r.Status().Update(ctx, inst)
+}
+
+func (r *ChatUIInstanceReconciler) instanceURL(host string) string {
 	scheme := r.PublicScheme
 	if scheme == "" {
 		scheme = "http"
 	}
-	inst.Status.URL = fmt.Sprintf("%s://%s", scheme, host)
-	inst.Status.ObservedGeneration = inst.Generation
-	return r.Status().Update(ctx, inst)
+	if strings.TrimSpace(host) == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s://%s", scheme, host)
 }
 
 func (r *ChatUIInstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -846,6 +1008,46 @@ func (r *ChatUIInstanceReconciler) instanceHost(slug string) (string, error) {
 
 func ptrTo[T any](v T) *T {
 	return &v
+}
+
+func ensureChatUIContainerProbes(c *corev1.Container) bool {
+	updated := false
+	if c.ReadinessProbe == nil ||
+		c.ReadinessProbe.HTTPGet == nil ||
+		c.ReadinessProbe.HTTPGet.Path != "/" ||
+		c.ReadinessProbe.HTTPGet.Port.IntValue() != 8080 {
+		c.ReadinessProbe = &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/",
+					Port: intstr.FromInt(8080),
+				},
+			},
+			PeriodSeconds:    5,
+			TimeoutSeconds:   2,
+			FailureThreshold: 6,
+		}
+		updated = true
+	}
+	if c.LivenessProbe == nil ||
+		c.LivenessProbe.HTTPGet == nil ||
+		c.LivenessProbe.HTTPGet.Path != "/" ||
+		c.LivenessProbe.HTTPGet.Port.IntValue() != 8080 {
+		c.LivenessProbe = &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/",
+					Port: intstr.FromInt(8080),
+				},
+			},
+			InitialDelaySeconds: 20,
+			PeriodSeconds:       10,
+			TimeoutSeconds:      2,
+			FailureThreshold:    6,
+		}
+		updated = true
+	}
+	return updated
 }
 
 func copyStringMap(in map[string]string) map[string]string {
