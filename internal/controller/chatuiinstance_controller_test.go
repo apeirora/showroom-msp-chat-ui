@@ -21,6 +21,7 @@ const (
 	testChatUIServiceName       = "demo-chatui"
 	testInstanceHost            = "test.example.com"
 	reasonDeploymentProgressing = "DeploymentProgressing"
+	reasonProvisioned           = "Provisioned"
 )
 
 var noopDNSChecker DNSChecker = func(_ context.Context, _ string) error { return nil }
@@ -70,7 +71,7 @@ func TestEvaluateInstanceReadiness(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: testNamespace},
 		}
 		deploy := readyChatUIDeployment()
-		endpoints := readyServiceEndpoints(8080)
+		endpoints := readyServiceEndpoints()
 
 		r := newChatUITestReconciler(func(_ context.Context, _ string) error {
 			return errors.New("probe failed")
@@ -93,7 +94,7 @@ func TestEvaluateInstanceReadiness(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: testNamespace},
 		}
 		deploy := readyChatUIDeployment()
-		endpoints := readyServiceEndpoints(8080)
+		endpoints := readyServiceEndpoints()
 
 		r := newChatUITestReconciler(func(_ context.Context, _ string) error { return nil }, noopDNSChecker, deploy, endpoints)
 
@@ -104,8 +105,8 @@ func TestEvaluateInstanceReadiness(t *testing.T) {
 		if !ready {
 			t.Fatalf("expected instance to be ready")
 		}
-		if reason != "Provisioned" {
-			t.Fatalf("expected reason Provisioned, got %q", reason)
+		if reason != reasonProvisioned {
+			t.Fatalf("expected reason %s, got %q", reasonProvisioned, reason)
 		}
 	})
 
@@ -114,7 +115,7 @@ func TestEvaluateInstanceReadiness(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: testNamespace},
 		}
 		deploy := readyChatUIDeployment()
-		endpoints := readyServiceEndpoints(8080)
+		endpoints := readyServiceEndpoints()
 
 		failingDNS := DNSChecker(func(_ context.Context, _ string) error {
 			return errors.New("no such host")
@@ -141,7 +142,7 @@ func TestEvaluateInstanceReadiness(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: testNamespace},
 		}
 		deploy := readyChatUIDeployment()
-		endpoints := readyServiceEndpoints(8080)
+		endpoints := readyServiceEndpoints()
 
 		passingDNS := DNSChecker(func(_ context.Context, _ string) error { return nil })
 		r := newChatUITestReconciler(
@@ -156,8 +157,8 @@ func TestEvaluateInstanceReadiness(t *testing.T) {
 		if !ready {
 			t.Fatalf("expected instance to be ready")
 		}
-		if reason != "Provisioned" {
-			t.Fatalf("expected reason Provisioned, got %q", reason)
+		if reason != reasonProvisioned {
+			t.Fatalf("expected reason %s, got %q", reasonProvisioned, reason)
 		}
 	})
 }
@@ -217,7 +218,7 @@ func readyChatUIDeployment() *appsv1.Deployment {
 	}
 }
 
-func readyServiceEndpoints(port int32) *corev1.Endpoints {
+func readyServiceEndpoints() *corev1.Endpoints {
 	return &corev1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testChatUIServiceName,
@@ -225,7 +226,7 @@ func readyServiceEndpoints(port int32) *corev1.Endpoints {
 		},
 		Subsets: []corev1.EndpointSubset{{
 			Addresses: []corev1.EndpointAddress{{IP: "10.0.0.10"}},
-			Ports:     []corev1.EndpointPort{{Port: port}},
+			Ports:     []corev1.EndpointPort{{Port: 8080}},
 		}},
 	}
 }
