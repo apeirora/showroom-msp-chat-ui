@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.5](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.5.4...v0.5.5) (2026-02-26)
+
+
+### Bug Fixes
+
+* **controller:** Gate chat UI readiness on deployment and service health ([#23](https://github.com/apeirora/showroom-msp-chat-ui/issues/23)) ([03397fe](https://github.com/apeirora/showroom-msp-chat-ui/commit/03397fe1441e4ac251573cc4b3c63555c23148a5))
+
 ## [0.5.4](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.5.3...v0.5.4) (2026-02-18)
 
 
