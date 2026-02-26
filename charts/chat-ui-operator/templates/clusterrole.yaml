@@ -8,7 +8,7 @@ rules:
     resources: ["chatuiinstances", "chatuiinstances/status", "chatuiinstances/finalizers"]
     verbs: ["get","list","watch","create","update","patch","delete"]
   - apiGroups: [""]
-    resources: ["secrets","services","events"]
+    resources: ["secrets","services","endpoints","events"]
     verbs: ["get","list","watch","create","update","patch","delete"]
   - apiGroups: ["apps"]
     resources: ["deployments"]
@@ -17,5 +17,4 @@ rules:
     resources: ["ingresses"]
     verbs: ["get","list","watch","create","update","patch","delete"]
 {{- end }}
-
 

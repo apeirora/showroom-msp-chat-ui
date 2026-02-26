@@ -1,11 +1,12 @@
 # Chat UI Operator
 
-Provides a HuggingFace‑style Chat UI (based on Open WebUI) as a Service for OpenAI‑compatible **Private LLM** backends.
+Provides a Open WebUI as a Service for OpenAI‑compatible **Private LLM** backends.
 
 ## What it is / scope
 - **Per‑tenant Chat UI**: Deploys one Open WebUI instance per `ChatUIInstance` CR.
 - **Private LLM backend**: Reads connection info from a Secret containing `OPENAI_API_URL` and `OPENAI_API_KEY` produced by the Private LLM operator’s *“Include URL in Secret”* feature.
 - **Ingress + URL wiring**: Exposes the UI via Ingress, using `<slug>.<PUBLIC_HOST>` and writes the public URL to `status.url`.
+- **Readiness gating**: Keeps `status.phase=Provisioning` and `Ready=False` until Deployment readiness, Service endpoints, and in-cluster HTTP checks pass.
 - **Demo‑first defaults**: UI auth is disabled (`WEBUI_AUTH=false`) and many advanced features are off; intended for demos and non‑sensitive playgrounds.
 
 ---
@@ -111,7 +112,7 @@ kubectl apply -f config/samples/ui_v1alpha1_chatuiinstance.yaml
 The operator will:
 - Deploy an Open WebUI `Deployment` and `Service` per instance.
 - Create a Traefik `Ingress` per instance with host `<slug>.<PUBLIC_HOST>`.
-- Populate `status.url` once the URL is known.
+- Populate `status.url` and switch to `status.phase=Ready` only when the service is actually reachable.
 
 ---
 
@@ -264,4 +265,3 @@ If you are consuming this via OCM, use your standard Platform Mesh OCM flows to 
     - Building and pushing `ghcr.io/apeirora/chat-ui-controller:X.Y.Z` (and `:latest`).
     - Packaging and pushing all four charts to `oci://ghcr.io/apeirora/charts` with `version: X.Y.Z`.
     - (Optionally) updating/publishing the OCM component when that pipeline is enabled.
-
