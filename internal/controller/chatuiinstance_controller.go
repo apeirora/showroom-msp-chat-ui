@@ -22,6 +22,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"net/http"
 	"sort"
 	"strings"
@@ -65,6 +66,9 @@ type ChatUIInstanceReconciler struct {
 	// ServiceHealthChecker probes service endpoints before publishing Ready=True.
 	// If nil, a default HTTP checker is used.
 	ServiceHealthChecker ServiceHealthChecker
+	// DNSChecker verifies that the instance hostname resolves before publishing Ready=True.
+	// If nil, a default net.Resolver-based checker is used.
+	DNSChecker DNSChecker
 }
 
 const (
@@ -75,6 +79,8 @@ const (
 )
 
 type ServiceHealthChecker func(ctx context.Context, targetURL string) error
+
+type DNSChecker func(ctx context.Context, host string) error
 
 //+kubebuilder:rbac:groups=ui.privatellms.msp,resources=chatuiinstances,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=ui.privatellms.msp,resources=chatuiinstances/status,verbs=get;update;patch
@@ -191,7 +197,7 @@ func (r *ChatUIInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	ready, reason, message, err := r.evaluateInstanceReadiness(ctx, inst, svcName)
+	ready, reason, message, err := r.evaluateInstanceReadiness(ctx, inst, svcName, instanceHost)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -765,7 +771,7 @@ func (r *ChatUIInstanceReconciler) ensureIngressTLS(ing *networkingv1.Ingress, h
 	return false
 }
 
-func (r *ChatUIInstanceReconciler) evaluateInstanceReadiness(ctx context.Context, inst *uiapiv1alpha1.ChatUIInstance, svcName string) (bool, string, string, error) {
+func (r *ChatUIInstanceReconciler) evaluateInstanceReadiness(ctx context.Context, inst *uiapiv1alpha1.ChatUIInstance, svcName, instanceHost string) (bool, string, string, error) {
 	deployName := fmt.Sprintf("%s-chatui", inst.Name)
 	var deploy appsv1.Deployment
 	if err := r.Get(ctx, client.ObjectKey{Namespace: inst.Namespace, Name: deployName}, &deploy); err != nil {
@@ -804,6 +810,10 @@ func (r *ChatUIInstanceReconciler) evaluateInstanceReadiness(ctx context.Context
 	probeURL := r.serviceProbeURL(inst.Namespace, svcName, 8080, "/")
 	if err := r.runServiceHealthCheck(ctx, probeURL); err != nil {
 		return false, "HealthCheckFailed", fmt.Sprintf("Service probe failed for %s: %v", probeURL, err), nil
+	}
+
+	if err := r.runDNSCheck(ctx, instanceHost); err != nil {
+		return false, "DNSNotReady", fmt.Sprintf("DNS not resolving for %s: %v", instanceHost, err), nil
 	}
 	return true, "Provisioned", "Chat UI is ready", nil
 }
@@ -857,6 +867,27 @@ func defaultServiceHealthChecker(ctx context.Context, targetURL string) error {
 	}()
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
 		return fmt.Errorf("unexpected status code %d", resp.StatusCode)
+	}
+	return nil
+}
+
+func (r *ChatUIInstanceReconciler) runDNSCheck(ctx context.Context, host string) error {
+	checker := r.DNSChecker
+	if checker == nil {
+		checker = defaultDNSChecker
+	}
+	checkCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	return checker(checkCtx, host)
+}
+
+func defaultDNSChecker(ctx context.Context, host string) error {
+	ips, err := net.DefaultResolver.LookupHost(ctx, host)
+	if err != nil {
+		return err
+	}
+	if len(ips) == 0 {
+		return fmt.Errorf("no addresses found")
 	}
 	return nil
 }

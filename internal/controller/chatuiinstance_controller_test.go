@@ -19,8 +19,11 @@ import (
 const (
 	testNamespace               = "default"
 	testChatUIServiceName       = "demo-chatui"
+	testInstanceHost            = "test.example.com"
 	reasonDeploymentProgressing = "DeploymentProgressing"
 )
+
+var noopDNSChecker DNSChecker = func(_ context.Context, _ string) error { return nil }
 
 func TestEvaluateInstanceReadiness(t *testing.T) {
 	t.Run("reports deployment progressing when status is stale", func(t *testing.T) {
@@ -30,8 +33,8 @@ func TestEvaluateInstanceReadiness(t *testing.T) {
 		deploy := readyChatUIDeployment()
 		deploy.Status.ObservedGeneration = 0
 
-		r := newChatUITestReconciler(nil, deploy)
-		ready, reason, _, err := r.evaluateInstanceReadiness(context.Background(), inst, testChatUIServiceName)
+		r := newChatUITestReconciler(nil, noopDNSChecker, deploy)
+		ready, reason, _, err := r.evaluateInstanceReadiness(context.Background(), inst, testChatUIServiceName, testInstanceHost)
 		if err != nil {
 			t.Fatalf("evaluateInstanceReadiness returned error: %v", err)
 		}
@@ -49,8 +52,8 @@ func TestEvaluateInstanceReadiness(t *testing.T) {
 		}
 		deploy := readyChatUIDeployment()
 
-		r := newChatUITestReconciler(nil, deploy)
-		ready, reason, _, err := r.evaluateInstanceReadiness(context.Background(), inst, testChatUIServiceName)
+		r := newChatUITestReconciler(nil, noopDNSChecker, deploy)
+		ready, reason, _, err := r.evaluateInstanceReadiness(context.Background(), inst, testChatUIServiceName, testInstanceHost)
 		if err != nil {
 			t.Fatalf("evaluateInstanceReadiness returned error: %v", err)
 		}
@@ -71,9 +74,9 @@ func TestEvaluateInstanceReadiness(t *testing.T) {
 
 		r := newChatUITestReconciler(func(_ context.Context, _ string) error {
 			return errors.New("probe failed")
-		}, deploy, endpoints)
+		}, noopDNSChecker, deploy, endpoints)
 
-		ready, reason, _, err := r.evaluateInstanceReadiness(context.Background(), inst, testChatUIServiceName)
+		ready, reason, _, err := r.evaluateInstanceReadiness(context.Background(), inst, testChatUIServiceName, testInstanceHost)
 		if err != nil {
 			t.Fatalf("evaluateInstanceReadiness returned error: %v", err)
 		}
@@ -92,9 +95,61 @@ func TestEvaluateInstanceReadiness(t *testing.T) {
 		deploy := readyChatUIDeployment()
 		endpoints := readyServiceEndpoints(8080)
 
-		r := newChatUITestReconciler(func(_ context.Context, _ string) error { return nil }, deploy, endpoints)
+		r := newChatUITestReconciler(func(_ context.Context, _ string) error { return nil }, noopDNSChecker, deploy, endpoints)
 
-		ready, reason, _, err := r.evaluateInstanceReadiness(context.Background(), inst, testChatUIServiceName)
+		ready, reason, _, err := r.evaluateInstanceReadiness(context.Background(), inst, testChatUIServiceName, testInstanceHost)
+		if err != nil {
+			t.Fatalf("evaluateInstanceReadiness returned error: %v", err)
+		}
+		if !ready {
+			t.Fatalf("expected instance to be ready")
+		}
+		if reason != "Provisioned" {
+			t.Fatalf("expected reason Provisioned, got %q", reason)
+		}
+	})
+
+	t.Run("reports DNS not ready when lookup fails", func(t *testing.T) {
+		inst := &uiapiv1alpha1.ChatUIInstance{
+			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: testNamespace},
+		}
+		deploy := readyChatUIDeployment()
+		endpoints := readyServiceEndpoints(8080)
+
+		failingDNS := DNSChecker(func(_ context.Context, _ string) error {
+			return errors.New("no such host")
+		})
+		r := newChatUITestReconciler(
+			func(_ context.Context, _ string) error { return nil },
+			failingDNS, deploy, endpoints,
+		)
+
+		ready, reason, _, err := r.evaluateInstanceReadiness(context.Background(), inst, testChatUIServiceName, testInstanceHost)
+		if err != nil {
+			t.Fatalf("evaluateInstanceReadiness returned error: %v", err)
+		}
+		if ready {
+			t.Fatalf("expected instance to be not ready")
+		}
+		if reason != "DNSNotReady" {
+			t.Fatalf("expected reason DNSNotReady, got %q", reason)
+		}
+	})
+
+	t.Run("marks ready when all checks including DNS pass", func(t *testing.T) {
+		inst := &uiapiv1alpha1.ChatUIInstance{
+			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: testNamespace},
+		}
+		deploy := readyChatUIDeployment()
+		endpoints := readyServiceEndpoints(8080)
+
+		passingDNS := DNSChecker(func(_ context.Context, _ string) error { return nil })
+		r := newChatUITestReconciler(
+			func(_ context.Context, _ string) error { return nil },
+			passingDNS, deploy, endpoints,
+		)
+
+		ready, reason, _, err := r.evaluateInstanceReadiness(context.Background(), inst, testChatUIServiceName, testInstanceHost)
 		if err != nil {
 			t.Fatalf("evaluateInstanceReadiness returned error: %v", err)
 		}
@@ -123,7 +178,7 @@ func TestEnsureChatUIContainerProbes(t *testing.T) {
 	}
 }
 
-func newChatUITestReconciler(checker ServiceHealthChecker, objects ...client.Object) *ChatUIInstanceReconciler {
+func newChatUITestReconciler(checker ServiceHealthChecker, dnsChecker DNSChecker, objects ...client.Object) *ChatUIInstanceReconciler {
 	scheme := runtime.NewScheme()
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = appsv1.AddToScheme(scheme)
@@ -138,6 +193,7 @@ func newChatUITestReconciler(checker ServiceHealthChecker, objects ...client.Obj
 		Client:               fakeClient,
 		Scheme:               scheme,
 		ServiceHealthChecker: checker,
+		DNSChecker:           dnsChecker,
 	}
 }
 
