@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.5.5...v0.6.0) (2026-02-26)
+
+
+### Features
+
+* **controller:** add DNS resolution gate to readiness checks ([#25](https://github.com/apeirora/showroom-msp-chat-ui/issues/25)) ([e874510](https://github.com/apeirora/showroom-msp-chat-ui/commit/e874510f462591e0ac5d0fb9730ebebaeb524c00))
+
 ## [0.5.5](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.5.4...v0.5.5) (2026-02-26)
 
 
