@@ -317,6 +317,7 @@ func (r *ChatUIInstanceReconciler) reconcileDeployment(ctx context.Context, inst
 		existing.Spec.Replicas = ptrTo(replicas)
 		updated = true
 	}
+	desiredSecretName := strings.TrimSpace(inst.Spec.CredentialsSecretRef.Name)
 	for i := range existing.Spec.Template.Spec.Containers {
 		c := &existing.Spec.Template.Spec.Containers[i]
 		if c.Name != "open-webui" {
@@ -328,6 +329,20 @@ func (r *ChatUIInstanceReconciler) reconcileDeployment(ctx context.Context, inst
 		}
 		if ensureChatUIContainerProbes(c) {
 			updated = true
+		}
+		// Update secret references if credentialsSecretRef.name changed
+		for j := range c.Env {
+			env := &c.Env[j]
+			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
+				if env.ValueFrom.SecretKeyRef.Name != desiredSecretName {
+					logger.Info("updating secret reference in env var",
+						"envVar", env.Name,
+						"oldSecret", env.ValueFrom.SecretKeyRef.Name,
+						"newSecret", desiredSecretName)
+					env.ValueFrom.SecretKeyRef.Name = desiredSecretName
+					updated = true
+				}
+			}
 		}
 	}
 	if !updated {
