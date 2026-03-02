@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.6.0...v0.6.1) (2026-03-02)
+
+
+### Bug Fixes
+
+* **controller:** update secret references when credentialsSecretRef changes ([#27](https://github.com/apeirora/showroom-msp-chat-ui/issues/27)) ([f80e3bf](https://github.com/apeirora/showroom-msp-chat-ui/commit/f80e3bfa0bb97d9e383e20f6da5735aa62de5763))
+
 ## [0.6.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.5.5...v0.6.0) (2026-02-26)
 
 
