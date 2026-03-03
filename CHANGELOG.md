@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.6.1...v0.7.0) (2026-03-03)
+
+
+### Features
+
+* **ui:** replace replicas text input with dropdown selector ([#29](https://github.com/apeirora/showroom-msp-chat-ui/issues/29)) ([24d7c6d](https://github.com/apeirora/showroom-msp-chat-ui/commit/24d7c6d9f2b4125bebe335c36ae81f1b65ea7d6d))
+
 ## [0.6.1](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.6.0...v0.6.1) (2026-03-02)
 
 
