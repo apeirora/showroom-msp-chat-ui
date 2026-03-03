@@ -71,7 +71,8 @@
                                         {
                                             "label": "Replicas",
                                             "property": "spec.replicas",
-                                            "defaultValue": 1
+                                            "values": ["1", "3", "6", "12"],
+                                            "defaultValue": "1"
                                         },
                                         {
                                             "label": "Credentials Secret",
