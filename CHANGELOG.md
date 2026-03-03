@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.7.0...v0.8.0) (2026-03-03)
+
+
+### Features
+
+* **chart:** make replicas field required ([#31](https://github.com/apeirora/showroom-msp-chat-ui/issues/31)) ([b43b3a8](https://github.com/apeirora/showroom-msp-chat-ui/commit/b43b3a8023a5ff3fe4711073ecbed6b90be8b7f1))
+
 ## [0.7.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.6.1...v0.7.0) (2026-03-03)
 
 
