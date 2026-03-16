@@ -72,6 +72,8 @@ operator:
   publicScheme: https
   tlsSecretName: "chat-ui-tls"
   imagePullSecretName: ghcr-credentials
+  imageRepository: ghcr.io/apeirora/chat-ui-controller
+  imageTag: "0.8.0"
   ingressExtraAnnotations: {}
 ```
 
@@ -91,6 +93,8 @@ operator:
 | `operator.publicScheme` | `http` or `https` | `https` |
 | `operator.tlsSecretName` | TLS secret for ingress | `""` |
 | `operator.imagePullSecretName` | Image pull secret name | `ghcr-credentials` |
+| `operator.imageRepository` | Operator image repository | `""` (uses chart default) |
+| `operator.imageTag` | Operator image tag | `""` (uses chart default) |
 | `operator.ingressExtraAnnotations` | Extra ingress annotations | `{}` |
 
 ## Step 3: Install via Helm
