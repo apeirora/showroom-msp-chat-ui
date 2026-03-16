@@ -93,7 +93,7 @@ operator:
 | `operator.publicScheme` | `http` or `https` | `https` |
 | `operator.tlsSecretName` | TLS secret for ingress | `""` |
 | `operator.imagePullSecretName` | Image pull secret name | `ghcr-credentials` |
-| `operator.imageRepository` | Operator image repository | `""` (uses chart default) |
+| `operator.imageRepository` | Operator image repository | `ghcr.io/apeirora/chat-ui-controller` |
 | `operator.imageTag` | Operator image tag | `""` (uses chart default) |
 | `operator.ingressExtraAnnotations` | Extra ingress annotations | `{}` |
 
