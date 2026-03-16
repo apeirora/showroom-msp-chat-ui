@@ -10,4 +10,4 @@ spec:
     name: {{ .Values.component.name }}
     namespace: {{ .Values.component.namespace }}
     resourceRef:
-      name: oci-helm-chart-chat-ui-operator
+      name: {{ .Values.component.chartResourceName | default "oci-helm-chart-chat-ui-operator" }}
