@@ -1,0 +1,17 @@
+component:
+  name: chat-ui-operator
+  namespace: ocm-system # fix: cannot be changed
+  componentName: ui.privatellms.msp/chat-ui
+  repositoryRefName: apeirora-repository
+  repositoryRefNamespace: ocm-system
+  semver: "v0.8.0"
+  interval: 1m
+
+operator:
+  targetNamespace: chat-ui
+  publicHost: chat.localhost
+  publicScheme: http
+  imagePullSecretName: ghcr-credentials
+  imagePullPolicy: IfNotPresent
+  tlsSecretName: ""
+  ingressExtraAnnotations: {}

@@ -1,0 +1,10 @@
+apiVersion: kro.run/v1alpha1
+kind: ChatUiOperatorRelease
+metadata:
+  name: chat-ui-operator-instance
+spec:
+  targetNamespace: chat-ui-system
+  publicHost: chat.localhost
+  publicScheme: http
+  imagePullSecretName: ghcr-credentials
+  tlsSecretName: ""
