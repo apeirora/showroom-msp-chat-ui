@@ -338,7 +338,6 @@ catalog-push: ## Push a catalog image.
 .PHONY: helm-lint
 helm-lint: ## lint all helm charts
 	helm lint charts/chat-ui-operator
-	helm lint charts/chat-ui-operator-ocm
 	helm lint charts/chat-ui-pm-integration
 	helm lint charts/chat-ui-sync-agent
 
@@ -346,8 +345,6 @@ helm-lint: ## lint all helm charts
 helm-package: chart ## package all helm charts
 	mkdir -p dist
 	helm package charts/chat-ui-operator -d dist
-	helm package charts/chat-ui-operator-ocm -d dist
 	helm package charts/chat-ui-pm-integration -d dist
 	helm package charts/chat-ui-sync-agent -d dist
-
 

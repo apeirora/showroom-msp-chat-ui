@@ -164,8 +164,8 @@ config/
 | `make docker-push` | Push Docker image |
 | `make install` | Install CRDs into current cluster |
 | `make deploy` | Deploy controller to current cluster |
-| `make helm-lint` | Lint Helm charts (`chat-ui-operator`, `chat-ui-operator-ocm`, `chat-ui-pm-integration`, `chat-ui-sync-agent`) |
-| `make helm-package` | Package Helm charts (`chat-ui-operator`, `chat-ui-operator-ocm`, `chat-ui-pm-integration`, `chat-ui-sync-agent`) |
+| `make helm-lint` | Lint Helm charts (`chat-ui-operator`, `chat-ui-pm-integration`, `chat-ui-sync-agent`) |
+| `make helm-package` | Package Helm charts (`chat-ui-operator`, `chat-ui-pm-integration`, `chat-ui-sync-agent`) |
 
 ## Cleanup
 
