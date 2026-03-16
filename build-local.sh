@@ -87,7 +87,7 @@ HELM_PUSH_SUCCESS=true
 for chart in $HELM_CHARTS; do
     echo "::group::Packaging and pushing $chart"
     chart_dir="charts/${chart}"
-    out_dir="dist/${chart}"
+    out_dir="dist/charts"
     pkg="${chart}-${VERSION}.tgz"
 
     helm dependency update "$chart_dir"

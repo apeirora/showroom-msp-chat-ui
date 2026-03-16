@@ -49,5 +49,6 @@ spec:
         PUBLIC_HOST: chat-ui.example.com
         PUBLIC_SCHEME: https
         TLS_SECRET_NAME: ""
-      imagePullSecrets:
-        - name: ghcr-credentials
+      image:
+        imagePullSecrets:
+          - name: ghcr-credentials
