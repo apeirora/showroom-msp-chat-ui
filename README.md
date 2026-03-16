@@ -137,11 +137,12 @@ kubectl get chatuiinstances -o wide
 
 ## Helm Charts
 
-This repository ships four Helm charts:
+This repository ships five Helm charts:
 
 | Chart | Purpose | Registry |
 |-------|---------|----------|
 | `chat-ui-operator` | Controller manager + CRD | `oci://ghcr.io/apeirora/charts/chat-ui-operator` |
+| `chat-ui-operator-ocm` | OCM-wrapped operator chart | `oci://ghcr.io/apeirora/charts/chat-ui-operator-ocm` |
 | `chat-ui-sync-agent` | KCP sync agent + PublishedResources | `oci://ghcr.io/apeirora/charts/chat-ui-sync-agent` |
 | `chat-ui-pm-integration` | APIExport, ProviderMetadata, ContentConfiguration | `oci://ghcr.io/apeirora/charts/chat-ui-pm-integration` |
 | `chat-ui-ui` | Portal content server (nginx serving `pm-content.json`) | `oci://ghcr.io/apeirora/charts/chat-ui-ui` |
@@ -161,6 +162,7 @@ This repository ships four Helm charts:
 ├── internal/controller/      # Reconciler logic
 ├── charts/
 │   ├── chat-ui-operator/     # Operator Helm chart
+│   ├── chat-ui-operator-ocm/ # OCM-wrapped operator chart
 │   ├── chat-ui-sync-agent/   # Sync agent chart
 │   ├── chat-ui-pm-integration/  # KCP portal metadata
 │   └── chat-ui-ui/           # Portal content server

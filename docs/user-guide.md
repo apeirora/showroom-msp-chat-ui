@@ -105,12 +105,7 @@ kubectl patch chatuiinstance my-chat --type merge \
   -p '{"spec":{"replicas":3}}'
 ```
 
-Set to `0` to pause without deleting:
-
-```bash
-kubectl patch chatuiinstance my-chat --type merge \
-  -p '{"spec":{"replicas":0}}'
-```
+> **Note**: The minimum replica count is 1. Values of 0 or below are overridden to 1 by the controller.
 
 ## Changing the Backend
 
@@ -164,7 +159,7 @@ Common reasons:
 | `DeploymentProgressing` | Pods are still rolling out | Wait, or check pod events |
 | `DeploymentNotReady` | Pods are not passing readiness probes | Check pod logs |
 | `ServiceEndpointsMissing` | No ready endpoints on port 8080 | Check pod health |
-| `HealthCheckFailed` | In-cluster HTTP probe returned non-2xx | Check Open WebUI logs |
+| `HealthCheckFailed` | In-cluster HTTP probe returned status code >= 400 | Check Open WebUI logs |
 | `DNSNotReady` | Hostname does not resolve yet | Wait for DNS propagation |
 
 ### Instance Shows Phase=Error
@@ -239,4 +234,4 @@ Releases follow [semantic versioning](https://semver.org/) managed by [release-p
 | OCM component | `oci://ghcr.io/apeirora/ocm` (component `ui.privatellms.msp/chat-ui`) |
 | Changelog | [CHANGELOG.md](../CHANGELOG.md) |
 
-All artifacts (image + 4 charts) share the same version number.
+All artifacts (image + 5 charts) share the same version number.

@@ -108,9 +108,9 @@ kubectl -n chat-ui get chatuiinstances -w
 # demo-chat   my-llm-backend   Ready          https://abc123.chat-ui.example.com
 ```
 
-## Install All Four Charts (Full Platform Mesh Setup)
+## Install All Charts (Full Platform Mesh Setup)
 
-For a complete Platform Mesh integration, install all four charts:
+For a complete Platform Mesh integration, install the charts:
 
 ```bash
 # 1. Operator (on MSP cluster)
@@ -124,8 +124,8 @@ helm upgrade --install chat-ui-operator \
 helm upgrade --install chat-ui-sync-agent \
   oci://ghcr.io/apeirora/charts/chat-ui-sync-agent \
   --namespace chat-ui \
-  --set publishedResources.namespace=chat-ui \
-  --set syncAgentOperator.kcpKubeconfig=pm-kubeconfig
+  --set publishedResources.namespace=api-syncagent \
+  --set syncAgentOperator.kcpKubeconfig=pm-kcp-kubeconfig
 
 # 3. PM Integration (applied to KCP provider workspace)
 helm upgrade --install chat-ui-pm-integration \

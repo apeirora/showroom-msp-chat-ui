@@ -1,5 +1,7 @@
 # Installation: Open Component Model (OCM)
 
+> **Warning**: The OCM publish step is currently commented out in the CI release workflow. No OCM components are being published to the registry yet. The instructions below are provided for reference and will work once OCM publishing is re-enabled.
+
 Install the Chat UI Operator using the Open Component Model for supply-chain-aware deployments.
 
 ---
