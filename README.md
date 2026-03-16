@@ -27,7 +27,7 @@ Chat UI Operator is a Kubernetes operator that deploys per-tenant [Open WebUI](h
 
 It is designed for the **ApeiroRA Showroom** -- a demo and experimentation environment -- and integrates natively with [Platform Mesh](https://apeirora.eu/) via KCP workspaces, sync agents, and the Showroom portal UI.
 
-### Key Features
+## Key Features
 
 - **One CR = One Chat UI** -- Each `ChatUIInstance` gets its own Open WebUI deployment with a stable, unique URL
 - **Credential wiring** -- Reads `OPENAI_API_URL` and `OPENAI_API_KEY` from a referenced Secret; auto-rolls pods on Secret changes
@@ -78,7 +78,7 @@ It is designed for the **ApeiroRA Showroom** -- a demo and experimentation envir
 
 ## Quick Start
 
-**1. Install the operator**
+### Install the Operator
 
 ```bash
 helm upgrade --install chat-ui-operator \
@@ -88,7 +88,7 @@ helm upgrade --install chat-ui-operator \
   --set env.PUBLIC_SCHEME=https
 ```
 
-**2. Create a credentials Secret**
+### Create a Credentials Secret
 
 ```yaml
 apiVersion: v1
@@ -103,7 +103,7 @@ stringData:
   OPENAI_API_KEY: "sk-..."
 ```
 
-**3. Create a ChatUIInstance**
+### Create a ChatUIInstance
 
 ```yaml
 apiVersion: ui.privatellms.msp/v1alpha1
@@ -116,7 +116,7 @@ spec:
   replicas: 1
 ```
 
-**4. Check the status**
+### Check the Status
 
 ```bash
 kubectl get chatuiinstances -o wide
@@ -126,7 +126,7 @@ kubectl get chatuiinstances -o wide
 
 ## Documentation
 
-| Document | Description |
+| Guide | Description |
 |----------|-------------|
 | [Architecture](docs/architecture.md) | Component interactions, CRD lifecycle, data flow diagrams |
 | [Helm Installation](docs/installation-helm.md) | Install via Helm on any cluster |

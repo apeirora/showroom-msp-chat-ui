@@ -1,4 +1,4 @@
-# Installation: Helm
+# Helm Installation
 
 Install the Chat UI Operator on any Kubernetes cluster using Helm.
 

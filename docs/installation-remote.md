@@ -1,4 +1,4 @@
-# Installation: Remote Cluster
+# Remote Deployment
 
 Deploy the Chat UI Operator to a remote Kubernetes cluster, either standalone or as part of the ApeiroRA Platform Mesh GitOps flow.
 

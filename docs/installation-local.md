@@ -1,4 +1,4 @@
-# Installation: Local Development
+# Local Development
 
 Set up a local development environment to build, test, and run the Chat UI Operator.
 
