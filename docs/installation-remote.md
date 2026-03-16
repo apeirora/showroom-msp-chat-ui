@@ -40,17 +40,19 @@ kubectl -n chat-ui logs deploy/chat-ui-operator-controller-manager
 
 ## Option B: GitOps with Flux (Platform Mesh)
 
-In the ApeiroRA Platform Mesh, Chat UI is deployed via Flux on MSP clusters. The infrastructure repository (`showroom-msp-cluster-infra`) contains all the manifests.
+In the ApeiroRA Platform Mesh, Chat UI is deployed via Flux on MSP clusters. The GitOps infrastructure repository contains all the manifests.
 
 ### Directory Structure
 
+Each provider follows a standard layout with a `base/` directory for shared resources and `overlays/` for environment-specific values:
+
 ```
-showroom-msp-cluster-infra/apps/chat-ui/
+apps/chat-ui/
 ├── base/
 │   ├── kustomization.yaml
 │   ├── namespace.yaml
 │   ├── pm-kubeconfig-external-secret.yaml
-│   ├── ghcr-showroom-external-secret.yaml
+│   ├── registry-credentials-external-secret.yaml
 │   ├── operator-helm.yaml          # HelmRelease for the operator
 │   ├── sync-agent-helm.yaml        # HelmRelease for the sync agent
 │   ├── pm-integration-helm.yaml    # HelmRelease for KCP integration
@@ -112,26 +114,26 @@ spec:
 
 ### Environment-Specific Values
 
-**Development** (`overlays/dev/operator-values.yaml`):
+**Example** (`overlays/dev/operator-values.yaml`):
 
 ```yaml
 image:
   repository: ghcr.io/apeirora/chat-ui-controller
   pullPolicy: Always
   imagePullSecrets:
-    - name: ghcr-showroom-secret
+    - name: ghcr-credentials
 env:
-  PUBLIC_HOST: chat-ui.msp01.dev.showroom.apeirora.eu
+  PUBLIC_HOST: chat-ui.example.com
   PUBLIC_SCHEME: https
   TLS_SECRET_NAME: chat-ui-tls
   INGRESS_EXTRA_ANNOTATIONS: |
-    {"dns.gardener.cloud/class":"garden","dns.gardener.cloud/dnsnames":"*.chat-ui.msp01.dev.showroom.apeirora.eu"}
+    {"dns.gardener.cloud/class":"garden","dns.gardener.cloud/dnsnames":"*.chat-ui.example.com"}
 ```
 
 ### Deployment Flow
 
 ```
-1. Push changes to showroom-msp-cluster-infra
+1. Push changes to the GitOps infrastructure repository
 2. Flux on MCP cluster detects change
 3. Flux Kustomization reconciles overlays/dev/
 4. HelmRelease objects are applied to MSP cluster
@@ -151,7 +153,7 @@ env:
   INGRESS_EXTRA_ANNOTATIONS: |
     {
       "dns.gardener.cloud/class": "garden",
-      "dns.gardener.cloud/dnsnames": "*.chat-ui.msp01.dev.showroom.apeirora.eu"
+      "dns.gardener.cloud/dnsnames": "*.chat-ui.example.com"
     }
 ```
 
@@ -178,13 +180,13 @@ If your cluster needs credentials to pull from `ghcr.io/apeirora`:
 ```yaml
 image:
   imagePullSecrets:
-    - name: ghcr-showroom-secret
+    - name: ghcr-credentials
 ```
 
 Create the Secret:
 
 ```bash
-kubectl -n chat-ui create secret docker-registry ghcr-showroom-secret \
+kubectl -n chat-ui create secret docker-registry ghcr-credentials \
   --docker-server=ghcr.io \
   --docker-username=<username> \
   --docker-password=<token>
