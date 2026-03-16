@@ -1,0 +1,20 @@
+component:
+  name: chat-ui
+  namespace: ocm-system
+  componentName: ui.privatellms.msp/chat-ui
+  repositoryUrl: ghcr.io/apeirora/ocm
+  secretRefName: ghcr-credentials
+  semver: ">=0.8.0"
+  interval: 1m
+  # chartResourceName: oci-helm-chart-chat-ui-operator
+
+operator:
+  targetNamespace: chat-ui
+  publicHost: chat.localhost
+  publicScheme: https
+  tlsSecretName: ""
+  imagePullSecretName: ghcr-credentials
+  ingressExtraAnnotations: {}
+  # Operator image overrides - should match the OCM component version
+  imageRepository: ghcr.io/apeirora/chat-ui-controller
+  imageTag: ""
