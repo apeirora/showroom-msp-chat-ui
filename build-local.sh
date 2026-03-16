@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # Configuration
-VERSION="${VERSION:-2.4.0}"
+VERSION="${VERSION:-0.8.0}"
 TOKEN_FILE="./token"
 HELM_CHARTS="chat-ui-operator chat-ui-sync-agent chat-ui-pm-integration chat-ui-ui"
 
