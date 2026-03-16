@@ -1,6 +1,3 @@
-# NOTE: This file contains ${GH_OWNER} and ${VERSION} placeholders.
-# Substitute them before applying, e.g.:
-#   envsubst < bootstrap.yaml | kubectl apply -f -
 apiVersion: delivery.ocm.software/v1alpha1
 kind: ComponentVersion
 metadata:

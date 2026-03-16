@@ -98,6 +98,7 @@ jobs:
       matrix:
         chart:
           - chat-ui-operator
+          - chat-ui-operator-ocm
           - chat-ui-sync-agent
           - chat-ui-pm-integration
           - chat-ui-ui
@@ -149,7 +150,7 @@ jobs:
       IMAGE: ${{ needs.publish-image.outputs.image }}
       CHART_REGISTRY: ${{ needs.publish-image.outputs.chart_registry }}
       OCM_REPOSITORY: ${{ needs.publish-image.outputs.ocm_repository }}
-      HELM_CHARTS: "chat-ui-operator chat-ui-sync-agent chat-ui-pm-integration"
+      HELM_CHARTS: "chat-ui-operator chat-ui-operator-ocm chat-ui-sync-agent chat-ui-pm-integration chat-ui-ui"
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -200,13 +201,20 @@ jobs:
         run: |
           curl -sSfL https://ocm.software/install.sh | sudo bash
 
-      # - name: Build and Push OCM component
-      #   run: |
-      #     mkdir -p dist/ctf
-      #     owner="${GITHUB_REPOSITORY_OWNER,,}"
-      #     ocm add componentversions --create --file dist/ctf .ocm/component-constructor.yaml \
-      #       VERSION="${VERSION}" GITHUB_REPOSITORY_OWNER="${owner}" IMAGE_TAG="${VERSION}" CHART_TAG="${VERSION}"
-      #     ocm transfer commontransportarchive dist/ctf "$OCM_REPOSITORY" --copy-resources --overwrite
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push OCM component
+        run: |
+          mkdir -p dist/ctf
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          ocm add componentversions --create --file dist/ctf .ocm/component-constructor.yaml \
+            VERSION="${VERSION}" GITHUB_REPOSITORY_OWNER="${owner}" IMAGE_TAG="${VERSION}" CHART_TAG="${VERSION}"
+          ocm transfer commontransportarchive dist/ctf "$OCM_REPOSITORY" --copy-resources --overwrite
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
