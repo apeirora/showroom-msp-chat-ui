@@ -21,5 +21,11 @@ spec:
         INGRESS_EXTRA_ANNOTATIONS: {{ .Values.operator.ingressExtraAnnotations | toJson | quote }}
         {{- end }}
       image:
+        {{- if .Values.operator.imageRepository }}
+        repository: {{ .Values.operator.imageRepository }}
+        {{- end }}
+        {{- if .Values.operator.imageTag }}
+        tag: {{ .Values.operator.imageTag | quote }}
+        {{- end }}
         imagePullSecrets:
           - name: {{ .Values.operator.imagePullSecretName }}
