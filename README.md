@@ -187,6 +187,14 @@ Apache License 2.0 -- see [LICENSE](LICENSE) for details.
 
 <p align="center">
   <sub>Built with care by <a href="https://apeirora.eu/">ApeiroRA</a></sub>
-  <br/>
+</p>
+
+<p align="center">
+  <a href="https://apeirora.eu/">
+    <img src="https://apeirora.eu/assets/img/BMWK-EU.png" alt="Funded by the European Union -- NextGenerationEU. Supported by the Federal Ministry for Economic Affairs and Energy on the basis of a decision by the German Bundestag." width="400" />
+  </a>
+</p>
+
+<p align="center">
   <sub>Co-funded by the European Union. Views expressed are those of the author(s) only and do not necessarily reflect those of the EU or the granting authority. Neither the EU nor the granting authority can be held responsible for them.</sub>
 </p>
