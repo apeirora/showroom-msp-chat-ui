@@ -1,6 +1,6 @@
 component:
-  name: chat-ui-operator
-  namespace: ocm-system # fix: cannot be changed
+  name: chat-ui
+  namespace: ocm-system
   componentName: ui.privatellms.msp/chat-ui
   repositoryUrl: ghcr.io/apeirora/ocm
   secretRefName: ghcr-credentials
@@ -10,8 +10,7 @@ component:
 operator:
   targetNamespace: chat-ui
   publicHost: chat.localhost
-  publicScheme: http
-  imagePullSecretName: ghcr-credentials
-  imagePullPolicy: IfNotPresent
+  publicScheme: https
   tlsSecretName: ""
+  imagePullSecretName: ghcr-credentials
   ingressExtraAnnotations: {}
