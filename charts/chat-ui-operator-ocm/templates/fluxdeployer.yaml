@@ -20,5 +20,6 @@ spec:
         {{- if .Values.operator.ingressExtraAnnotations }}
         INGRESS_EXTRA_ANNOTATIONS: {{ .Values.operator.ingressExtraAnnotations | toJson | quote }}
         {{- end }}
-      imagePullSecrets:
-        - name: {{ .Values.operator.imagePullSecretName }}
+      image:
+        imagePullSecrets:
+          - name: {{ .Values.operator.imagePullSecretName }}
