@@ -1,0 +1,31 @@
+apiVersion: delivery.ocm.software/v1alpha1
+kind: FluxDeployer
+metadata:
+  name: {{ .Values.component.name }}
+  namespace: {{ .Values.component.namespace }}
+spec:
+  interval: {{ .Values.component.interval }}
+  sourceRef:
+    kind: Resource
+    name: {{ .Values.component.name }}-chart
+    namespace: {{ .Values.component.namespace }}
+  helmReleaseTemplate:
+    releaseName: {{ .Values.component.name }}
+    targetNamespace: {{ .Values.operator.targetNamespace }}
+    values:
+      env:
+        PUBLIC_HOST: {{ .Values.operator.publicHost }}
+        PUBLIC_SCHEME: {{ .Values.operator.publicScheme }}
+        TLS_SECRET_NAME: {{ .Values.operator.tlsSecretName | quote }}
+        {{- if .Values.operator.ingressExtraAnnotations }}
+        INGRESS_EXTRA_ANNOTATIONS: {{ .Values.operator.ingressExtraAnnotations | toJson | quote }}
+        {{- end }}
+      image:
+        {{- if .Values.operator.imageRepository }}
+        repository: {{ .Values.operator.imageRepository }}
+        {{- end }}
+        {{- if .Values.operator.imageTag }}
+        tag: {{ .Values.operator.imageTag | quote }}
+        {{- end }}
+        imagePullSecrets:
+          - name: {{ .Values.operator.imagePullSecretName }}

@@ -1,0 +1,51 @@
+apiVersion: delivery.ocm.software/v1alpha1
+kind: ComponentVersion
+metadata:
+  name: chat-ui
+  namespace: ocm-system
+spec:
+  component: ui.privatellms.msp/chat-ui
+  version:
+    semver: "${VERSION}"
+  repository:
+    url: ghcr.io/${GH_OWNER}/ocm
+    secretRef:
+      name: ghcr-credentials
+  interval: 1m
+---
+apiVersion: delivery.ocm.software/v1alpha1
+kind: Resource
+metadata:
+  name: chat-ui-chart
+  namespace: ocm-system
+spec:
+  interval: 1m
+  sourceRef:
+    kind: ComponentVersion
+    name: chat-ui
+    namespace: ocm-system
+    resourceRef:
+      name: oci-helm-chart-chat-ui-operator
+---
+apiVersion: delivery.ocm.software/v1alpha1
+kind: FluxDeployer
+metadata:
+  name: chat-ui
+  namespace: ocm-system
+spec:
+  interval: 1m
+  sourceRef:
+    kind: Resource
+    name: chat-ui-chart
+    namespace: ocm-system
+  helmReleaseTemplate:
+    releaseName: chat-ui-operator
+    targetNamespace: chat-ui
+    values:
+      env:
+        PUBLIC_HOST: chat-ui.example.com
+        PUBLIC_SCHEME: https
+        TLS_SECRET_NAME: ""
+      image:
+        imagePullSecrets:
+          - name: ghcr-credentials
