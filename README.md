@@ -13,6 +13,7 @@
   <a href="go.mod"><img alt="Go Version" src="https://img.shields.io/github/go-mod/go-version/apeirora/showroom-msp-chat-ui?style=flat-square" /></a>
   <a href="https://github.com/apeirora/showroom-msp-chat-ui/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/apeirora/showroom-msp-chat-ui/ci.yml?branch=main&style=flat-square&label=CI" /></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-green?style=flat-square" /></a>
+  <a href="https://api.reuse.software/info/github.com/apeirora/showroom-msp-chat-ui"><img alt="REUSE" src="https://api.reuse.software/badge/github.com/apeirora/showroom-msp-chat-ui" /></a>
 </p>
 
 <p align="center">
