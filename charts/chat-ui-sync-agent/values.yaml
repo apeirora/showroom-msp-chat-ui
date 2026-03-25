@@ -1,18 +1,21 @@
 syncAgentOperator:
   enabled: true
   apiExportName: ui.privatellms.msp
+  apiExportEndpointSliceName: ui.privatellms.msp
   agentName: chat-ui-agent
   kcpKubeconfig: pm-kcp-kubeconfig
   extraFlags: []
   crds:
     enabled: false
-  hostAliases: []
-  # For local Platform Mesh setup (Kind cluster), uncomment:
-  # hostAliases:
-  #   - ip: "10.96.x.x"  # Traefik ClusterIP — run: kubectl get svc traefik -o jsonpath='{.spec.clusterIP}'
-  #     hostnames:
-  #       - "root.kcp.localhost"
-  #       - "kcp.localhost"
+  hostAliases:
+    enabled: false
+    # For local Platform Mesh setup (Kind cluster):
+    # enabled: true
+    # values:
+    #   - ip: "10.96.x.x"  # Traefik ClusterIP — run: kubectl get svc traefik -o jsonpath='{.spec.clusterIP}'
+    #     hostnames:
+    #       - "root.kcp.localhost"
+    #       - "kcp.localhost"
 
 publishedResources:
   enabled: true
