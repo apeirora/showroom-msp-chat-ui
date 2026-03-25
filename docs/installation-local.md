@@ -63,7 +63,7 @@ helm install chat-ui-operator charts/chat-ui-operator \
 
 ```bash
 export KUBECONFIG=.secret/kcp/admin.kubeconfig
-export KCP_URL="https://kcp.api.portal.dev.local:8443"
+export KCP_URL="https://localhost:8443"
 
 kubectl ws create chat-ui --type=root:provider \
   --server="$KCP_URL/clusters/root:providers"
@@ -117,7 +117,7 @@ Assumes the `root:orgs:demo` workspace and LLM APIBinding already exist from the
 
 ```bash
 export KUBECONFIG=.secret/kcp/admin.kubeconfig
-export KCP_URL="https://kcp.api.portal.dev.local:8443"
+export KCP_URL="https://localhost:8443"
 
 # Bind to the Chat UI APIExport (see https://docs.kcp.io/kcp/main/concepts/apis/)
 kubectl apply --server="$KCP_URL/clusters/root:orgs:demo" -f - <<'EOF'
@@ -307,7 +307,7 @@ Check the kubeconfig secret:
 kubectl -n api-syncagent get secret pm-kcp-kubeconfig -o jsonpath='{.data.kubeconfig}' | base64 -d | head -5
 ```
 
-Since both KCP and the sync agent run in the same Kind cluster, the KCP admin kubeconfig should work. Make sure `/etc/hosts` has the entry for `kcp.api.portal.dev.local`.
+Since both KCP and the sync agent run in the same Kind cluster, the KCP admin kubeconfig (which uses `localhost:8443`) should work without any `/etc/hosts` entries.
 
 ### kubectl ws: command not found
 
