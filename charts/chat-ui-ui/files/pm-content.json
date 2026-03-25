@@ -30,7 +30,7 @@
                         "resourceDefinition": {
                             "group": "ui.privatellms.msp",
                             "version": "v1alpha1",
-                            "plural": "ChatUIInstances",
+                            "plural": "chatuiinstances",
                             "singular": "chatuiinstance",
                             "kind": "ChatUIInstance",
                             "scope": "Namespaced",
