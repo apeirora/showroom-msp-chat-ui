@@ -12,7 +12,7 @@ Set up a local development environment to build, test, and run the Chat UI Opera
 | Kind | 0.20+ | Local Kubernetes cluster |
 | kubectl | 1.28+ | Interact with the cluster |
 | Helm | 3.12+ | Chart installation |
-| [kubectl-kcp](https://github.com/kcp-dev/kcp/releases) | latest | `kubectl ws` for KCP workspace management |
+| [kubectl-kcp](https://github.com/kcp-dev/kcp/releases) | latest | `kubectl kcp workspace` for KCP workspace management |
 | Go | 1.23+ | Build from source (optional) |
 | Make | -- | Build automation (optional) |
 
@@ -21,17 +21,6 @@ The Quick Start requires:
 - [Private LLM operator installed locally](https://github.com/apeirora/showroom-msp-private-llm/blob/main/docs/installation-local.md) (steps 1–6)
 
 See the [Private LLM local docs](https://github.com/apeirora/showroom-msp-private-llm/blob/main/docs/installation-local.md) for `kubectl-kcp` installation instructions and `/etc/hosts` setup.
-
-> **Private registry:** The operator image is hosted on `ghcr.io/apeirora` (private). If you get `ImagePullBackOff`, either run `docker login ghcr.io` before creating the Kind cluster or create a pull secret:
->
-> ```bash
-> kubectl -n chat-ui-system create secret docker-registry ghcr-creds \
->   --docker-server=ghcr.io \
->   --docker-username="$GH_OWNER" \
->   --docker-password="$GITHUB_TOKEN"
-> ```
->
-> Then add `--set 'image.imagePullSecrets[0].name=ghcr-creds'` to the Helm install command.
 
 ## Key Concepts
 
@@ -65,8 +54,10 @@ helm install chat-ui-operator charts/chat-ui-operator \
 export KUBECONFIG=.secret/kcp/admin.kubeconfig
 export KCP_URL="https://localhost:8443"
 
-kubectl ws create chat-ui --type=root:provider \
+kubectl kcp workspace create chat-ui --type=root:provider \
   --server="$KCP_URL/clusters/root:providers"
+
+kubectl create ns default --server="$KCP_URL/clusters/root:providers:chat-ui"
 ```
 
 ### 3. Install the PM integration chart in KCP
@@ -87,28 +78,36 @@ Switch back to the Kind kubeconfig:
 ```bash
 unset KUBECONFIG  # target the Kind cluster
 
-# Create KCP kubeconfig secret (skip if already created for Private LLM)
-kubectl create namespace api-syncagent --dry-run=client -o yaml | kubectl apply -f -
-kubectl -n api-syncagent create secret generic pm-kcp-kubeconfig \
-  --from-file=kubeconfig=.secret/kcp/admin.kubeconfig \
+# Create KCP kubeconfig secret for the sync agent
+FRONTPROXY="https://frontproxy-front-proxy.platform-mesh-system.svc.cluster.local:6443"
+sed "s|https://localhost:8443/clusters/root|${FRONTPROXY}/clusters/root:providers:chat-ui|" \
+  .secret/kcp/admin.kubeconfig > /tmp/chat-ui-sync-kubeconfig.yaml
+
+kubectl -n chat-ui-system create secret generic pm-kcp-kubeconfig \
+  --from-file=kubeconfig=/tmp/chat-ui-sync-kubeconfig.yaml \
   --dry-run=client -o yaml | kubectl apply -f -
 
 # Install the sync agent
 helm upgrade --install chat-ui-sync-agent charts/chat-ui-sync-agent \
-  --namespace api-syncagent \
+  --namespace chat-ui-system \
   --dependency-update \
   --set syncAgentOperator.enabled=true \
   --set syncAgentOperator.apiExportName=ui.privatellms.msp \
   --set syncAgentOperator.agentName=chat-ui-agent \
   --set syncAgentOperator.kcpKubeconfig=pm-kcp-kubeconfig \
   --set publishedResources.enabled=true \
-  --set publishedResources.namespace=api-syncagent
+  --set publishedResources.namespace=chat-ui-system
+
+# Patch hostAliases so the sync agent can resolve the KCP front-proxy
+TRAEFIK_IP=$(kubectl get svc traefik -o jsonpath='{.spec.clusterIP}')
+kubectl -n chat-ui-system patch deployment chat-ui-sync-agent \
+  --type=json -p="[{\"op\":\"add\",\"path\":\"/spec/template/spec/hostAliases\",\"value\":[{\"ip\":\"$TRAEFIK_IP\",\"hostnames\":[\"root.kcp.localhost\"]}]}]"
 ```
 
 Verify it's running:
 
 ```bash
-kubectl -n api-syncagent logs deploy/chat-ui-agent --tail=10
+kubectl -n chat-ui-system logs deploy/chat-ui-agent --tail=10
 ```
 
 ### 5. Bind and create a ChatUIInstance via KCP
@@ -279,7 +278,7 @@ make helm-lint  # Helm chart linting
 ```bash
 unset KUBECONFIG
 helm uninstall chat-ui-operator -n chat-ui-system
-helm uninstall chat-ui-sync-agent -n api-syncagent
+helm uninstall chat-ui-sync-agent -n chat-ui-system
 make uninstall
 
 kind delete cluster --name chat-ui-dev
@@ -291,10 +290,6 @@ kind delete cluster --name chat-ui-dev
 
 The readiness check requires DNS resolution of the Ingress hostname, which won't work without an Ingress controller. The Open WebUI pod is still running — use `kubectl port-forward` to access it.
 
-### ImagePullBackOff for operator image
-
-See the Prerequisites section for setting up `ghcr-creds`.
-
 ### KUBECONFIG confusion
 
 The Quick Start switches between two kubeconfigs. See the [Private LLM troubleshooting](https://github.com/apeirora/showroom-msp-private-llm/blob/main/docs/installation-local.md#kubeconfig-confusion) section for details.
@@ -304,11 +299,11 @@ The Quick Start switches between two kubeconfigs. See the [Private LLM troublesh
 Check the kubeconfig secret:
 
 ```bash
-kubectl -n api-syncagent get secret pm-kcp-kubeconfig -o jsonpath='{.data.kubeconfig}' | base64 -d | head -5
+kubectl -n chat-ui-system get secret pm-kcp-kubeconfig -o jsonpath='{.data.kubeconfig}' | base64 -d | head -5
 ```
 
-Since both KCP and the sync agent run in the same Kind cluster, the KCP admin kubeconfig (which uses `localhost:8443`) should work without any `/etc/hosts` entries.
+The sync agent kubeconfig should use the in-cluster front-proxy address (`frontproxy-front-proxy.platform-mesh-system.svc.cluster.local:6443`), not `localhost:8443` which is not reachable from inside Kind pods.
 
-### kubectl ws: command not found
+### kubectl kcp workspace: command not found
 
 Install the [kubectl-kcp plugin](https://github.com/kcp-dev/kcp/releases). See the [Private LLM prerequisites](https://github.com/apeirora/showroom-msp-private-llm/blob/main/docs/installation-local.md#install-kubectl-kcp).
