@@ -96,7 +96,8 @@ helm upgrade --install chat-ui-sync-agent charts/chat-ui-sync-agent \
   --set syncAgentOperator.agentName=chat-ui-agent \
   --set syncAgentOperator.kcpKubeconfig=pm-kcp-kubeconfig \
   --set publishedResources.enabled=true \
-  --set publishedResources.namespace=chat-ui-system
+  --set publishedResources.namespace=chat-ui-system \
+  --set 'syncAgentOperator.extraFlags[0]=--published-resource-selector=app.kubernetes.io/name=chat-ui-sync-agent'
 
 # Patch hostAliases so the sync agent can resolve the KCP front-proxy
 TRAEFIK_IP=$(kubectl get svc traefik -o jsonpath='{.spec.clusterIP}')
