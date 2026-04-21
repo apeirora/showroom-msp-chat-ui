@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.3](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.9.2...v0.9.3) (2026-04-21)
+
+
+### Bug Fixes
+
+* **ci:** recursively pull deps before packaging umbrella charts ([#58](https://github.com/apeirora/showroom-msp-chat-ui/issues/58)) ([47c26df](https://github.com/apeirora/showroom-msp-chat-ui/commit/47c26df367d243b1b9a9697a15517a4387000694))
+
 ## [0.9.2](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.9.1...v0.9.2) (2026-04-21)
 
 
