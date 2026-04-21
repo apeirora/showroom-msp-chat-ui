@@ -102,6 +102,8 @@ jobs:
           - chat-ui-sync-agent
           - chat-ui-pm-integration
           - chat-ui-ui
+          - chat-ui-msp-app
+          - chat-ui-pm-app
     env:
       VERSION: ${{ needs.publish-image.outputs.version }}
       CHART_REGISTRY: ${{ needs.publish-image.outputs.chart_registry }}
@@ -150,7 +152,7 @@ jobs:
       IMAGE: ${{ needs.publish-image.outputs.image }}
       CHART_REGISTRY: ${{ needs.publish-image.outputs.chart_registry }}
       OCM_REPOSITORY: ${{ needs.publish-image.outputs.ocm_repository }}
-      HELM_CHARTS: "chat-ui-operator chat-ui-operator-ocm chat-ui-sync-agent chat-ui-pm-integration chat-ui-ui"
+      HELM_CHARTS: "chat-ui-operator chat-ui-operator-ocm chat-ui-sync-agent chat-ui-pm-integration chat-ui-ui chat-ui-msp-app chat-ui-pm-app"
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
