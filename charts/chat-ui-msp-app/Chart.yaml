@@ -1,0 +1,21 @@
+apiVersion: v2
+name: chat-ui-msp-app
+description: >-
+  Umbrella chart for the Chat UI provider. Installs the operator, the sync
+  agent, and the portal UI bundle on an MSP (workload) cluster, and generates
+  the sync agent's in-cluster KCP kubeconfig when given the KCP admin
+  kubeconfig.
+type: application
+version: 0.8.0
+appVersion: 0.8.0
+dependencies:
+  - name: chat-ui-operator
+    version: 0.8.0
+    repository: file://../chat-ui-operator
+  - name: chat-ui-sync-agent
+    version: 0.8.0
+    repository: file://../chat-ui-sync-agent
+  - name: chat-ui-ui
+    version: 0.1.0
+    repository: file://../chat-ui-ui
+    condition: chat-ui-ui.enabled

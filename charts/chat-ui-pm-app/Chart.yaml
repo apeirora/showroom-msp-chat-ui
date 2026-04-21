@@ -1,0 +1,14 @@
+apiVersion: v2
+name: chat-ui-pm-app
+description: >-
+  Umbrella chart for the KCP (Platform Mesh) side of the Chat UI provider.
+  Installs the APIExport, ProviderMetadata, and ContentConfiguration in a
+  provider workspace. Install with kubeconfig/kube-apiserver pointing at the
+  target KCP workspace.
+type: application
+version: 0.8.0
+appVersion: 0.8.0
+dependencies:
+  - name: chat-ui-pm-integration
+    version: 0.8.0
+    repository: file://../chat-ui-pm-integration

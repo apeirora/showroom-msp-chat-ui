@@ -130,6 +130,8 @@ jobs:
           - chat-ui-operator
           - chat-ui-pm-integration
           - chat-ui-sync-agent
+          - chat-ui-msp-app
+          - chat-ui-pm-app
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
