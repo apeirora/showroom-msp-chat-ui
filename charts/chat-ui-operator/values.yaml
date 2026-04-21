@@ -1,6 +1,6 @@
 image:
   repository: ghcr.io/apeirora/chat-ui-controller
-  tag: 0.8.0
+  tag: 0.9.0
   pullPolicy: IfNotPresent
   imagePullSecrets: []
 manager:
