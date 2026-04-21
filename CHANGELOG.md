@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.9.0...v0.9.1) (2026-04-21)
+
+
+### Bug Fixes
+
+* **build:** bump builder image to golang:1.24 to match go.mod ([#54](https://github.com/apeirora/showroom-msp-chat-ui/issues/54)) ([e25af96](https://github.com/apeirora/showroom-msp-chat-ui/commit/e25af96275a4ba2697ace434d44fd02fdbeff77b))
+
 ## [0.9.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.8.0...v0.9.0) (2026-04-21)
 
 
