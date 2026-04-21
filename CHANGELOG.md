@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.4](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.9.3...v0.9.4) (2026-04-21)
+
+
+### Bug Fixes
+
+* **chart:** emit APIExport permissionClaims with all:true ([#60](https://github.com/apeirora/showroom-msp-chat-ui/issues/60)) ([500bd33](https://github.com/apeirora/showroom-msp-chat-ui/commit/500bd33cf9c216a5aeb847725baa4e311e0a7de0))
+
 ## [0.9.3](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.9.2...v0.9.3) (2026-04-21)
 
 

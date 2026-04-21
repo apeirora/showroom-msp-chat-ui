@@ -6,8 +6,8 @@ description: >-
   provider workspace. Install with kubeconfig/kube-apiserver pointing at the
   target KCP workspace.
 type: application
-version: 0.9.3
-appVersion: 0.9.3
+version: 0.9.4
+appVersion: 0.9.4
 dependencies:
   - name: chat-ui-pm-integration
     version: '>=0.8.0 <1.0.0'
