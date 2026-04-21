@@ -1,0 +1,46 @@
+publicHost: localhost
+publicScheme: http
+
+# KCP sync-agent kubeconfig. See private-llm-msp-app/values.yaml for the full
+# schema — the two umbrellas share the same design.
+kcpKubeconfig:
+  secretName: pm-kcp-kubeconfig
+  existingSecret: ""
+  adminContent: ""
+  providerWorkspace: root:providers:chat-ui
+  inClusterServerUrl: https://frontproxy-front-proxy.platform-mesh-system.svc.cluster.local:6443
+
+imagePullSecret:
+  create: false
+  name: ghcr-credentials
+  dockerConfigJson: ""
+
+# Passed through to the operator sub-chart.
+chat-ui-operator:
+  env:
+    PUBLIC_HOST: localhost
+    PUBLIC_SCHEME: http
+
+# Passed through to the sync agent sub-chart. Values duplicated under the alias
+# and chart-name paths — see private-llm-msp-app/values.yaml for rationale.
+chat-ui-sync-agent:
+  syncAgentOperator: &syncAgentValues
+    enabled: true
+    apiExportName: ui.privatellms.msp
+    apiExportEndpointSliceName: ui.privatellms.msp
+    agentName: chat-ui-agent
+    kcpKubeconfig: pm-kcp-kubeconfig
+    extraFlags:
+      - --published-resource-selector=app.kubernetes.io/name=chat-ui-sync-agent
+    crds:
+      enabled: false
+  api-syncagent: *syncAgentValues
+  publishedResources:
+    enabled: true
+    namespace: ""   # defaults to release namespace
+    serviceAccountName: ""
+    credentialSecrets:
+      enabled: true
+
+chat-ui-ui:
+  enabled: false   # opt-in; bare operator is enough for the tutorial

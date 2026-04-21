@@ -1,126 +1,75 @@
-# Local Development
+# Local Installation
 
-Set up a local development environment to build, test, and run the Chat UI Operator.
-
----
+Install the Chat UI provider on a local [Platform Mesh](https://github.com/platform-mesh/helm-charts) setup with two `helm install` commands.
 
 ## Prerequisites
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| Docker | 20+ | Build container images, run Kind |
-| Kind | 0.20+ | Local Kubernetes cluster |
-| kubectl | 1.28+ | Interact with the cluster |
-| Helm | 3.12+ | Chart installation |
-| [kubectl-kcp](https://github.com/kcp-dev/kcp/releases) | latest | `kubectl kcp workspace` for KCP workspace management |
-| Go | 1.23+ | Build from source (optional) |
-| Make | -- | Build automation (optional) |
-
-The Quick Start requires:
 - [Platform Mesh local-setup](https://github.com/platform-mesh/helm-charts/tree/main/local-setup) running (`task local-setup`)
-- [Private LLM operator installed locally](https://github.com/apeirora/showroom-msp-private-llm/blob/main/docs/installation-local.md) (steps 1–6)
+- [kubectl-kcp plugin](https://github.com/kcp-dev/kcp/releases) — provides `kubectl kcp workspace`
+- [Helm](https://helm.sh/) 3.14+
+- An OpenAI-compatible endpoint to point Chat UI at. The Platform Mesh tutorial installs [Private LLM](https://github.com/apeirora/showroom-msp-private-llm/blob/main/docs/installation-local.md) first; alternatively, supply your own endpoint via a Secret (see [Create a ChatUIInstance](#create-a-chatuiinstance-consumer-side)).
 
-See the [Private LLM local docs](https://github.com/apeirora/showroom-msp-private-llm/blob/main/docs/installation-local.md) for `kubectl-kcp` installation instructions and `/etc/hosts` setup.
+Export the admin kubeconfig path and KCP URL (only needed once per shell):
 
-## Key Concepts
-
-If you're new to Platform Mesh, these resources explain the core concepts used in this guide:
-
-- [**KCP Workspaces**](https://docs.kcp.io/kcp/main/concepts/workspaces/) — multi-tenant control plane that hosts provider and consumer workspaces
-- [**APIExport & APIBinding**](https://docs.kcp.io/kcp/main/concepts/apis/) — how providers expose APIs and consumers bind to them
-- [**API Sync Agent & PublishedResource**](https://docs.kcp.io/api-syncagent/) — how CRs created in KCP are synced to workload clusters
-- [**Architecture overview**](./architecture.md) — how the operator, sync agent, and KCP fit together
-
-## Quick Start
-
-Follow the [Private LLM local installation](https://github.com/apeirora/showroom-msp-private-llm/blob/main/docs/installation-local.md) steps 1–6 first. Once the Private LLM operator, sync agent, and a test LLMInstance are running, continue here to add Chat UI.
-
-### 1. Install the Chat UI operator
-
-Make sure `KUBECONFIG` targets the Kind cluster (not KCP):
-
-```bash
-unset KUBECONFIG  # target the Kind cluster
-
-helm install chat-ui-operator charts/chat-ui-operator \
-  --namespace chat-ui-system --create-namespace \
-  --set env.PUBLIC_HOST=localhost \
-  --set env.PUBLIC_SCHEME=http
-```
-
-### 2. Create the Chat UI [provider workspace](https://docs.kcp.io/kcp/main/concepts/apis/) in KCP
-
-```bash
-export KUBECONFIG=.secret/kcp/admin.kubeconfig
+```sh
+export HELM_CHARTS_DIR="$(pwd)"       # assumes CWD is the platform-mesh/helm-charts repo
+export KCP="$HELM_CHARTS_DIR/.secret/kcp/admin.kubeconfig"
 export KCP_URL="https://localhost:8443"
-
-kubectl kcp workspace create chat-ui --type=root:provider \
-  --server="$KCP_URL/clusters/root:providers"
-
-kubectl create ns default --server="$KCP_URL/clusters/root:providers:chat-ui"
 ```
 
-### 3. Install the PM integration chart in KCP
+## Install
 
-```bash
-helm upgrade --install chat-ui-pm charts/chat-ui-pm-integration \
-  --namespace default \
-  --kubeconfig .secret/kcp/admin.kubeconfig \
-  --kube-apiserver "$KCP_URL/clusters/root:providers:chat-ui" \
-  --set publicHost=localhost \
-  --set publicScheme=http
+### 1. Create the provider workspace on KCP
+
+```sh
+kubectl kcp workspace create providers --type=root:providers --ignore-existing --kubeconfig=$KCP
+kubectl kcp workspace use root:providers --kubeconfig=$KCP
+kubectl kcp workspace create chat-ui --type=root:provider --ignore-existing --kubeconfig=$KCP
 ```
 
-### 4. Install the Chat UI [sync agent](https://docs.kcp.io/api-syncagent/)
+### 2. Install the MSP-side umbrella (Kind cluster)
 
-Switch back to the Kind kubeconfig:
-
-```bash
-unset KUBECONFIG  # target the Kind cluster
-
-# Create KCP kubeconfig secret for the sync agent
-FRONTPROXY="https://frontproxy-front-proxy.platform-mesh-system.svc.cluster.local:6443"
-sed "s|https://localhost:8443/clusters/root|${FRONTPROXY}/clusters/root:providers:chat-ui|" \
-  .secret/kcp/admin.kubeconfig > /tmp/chat-ui-sync-kubeconfig.yaml
-
-kubectl -n chat-ui-system create secret generic pm-kcp-kubeconfig \
-  --from-file=kubeconfig=/tmp/chat-ui-sync-kubeconfig.yaml \
-  --dry-run=client -o yaml | kubectl apply -f -
-
-# Install the sync agent
-helm upgrade --install chat-ui-sync-agent charts/chat-ui-sync-agent \
-  --namespace chat-ui-system \
-  --dependency-update \
-  --set syncAgentOperator.enabled=true \
-  --set syncAgentOperator.apiExportName=ui.privatellms.msp \
-  --set syncAgentOperator.agentName=chat-ui-agent \
-  --set syncAgentOperator.kcpKubeconfig=pm-kcp-kubeconfig \
-  --set publishedResources.enabled=true \
-  --set publishedResources.namespace=chat-ui-system \
-  --set 'syncAgentOperator.extraFlags[0]=--published-resource-selector=app.kubernetes.io/name=chat-ui-sync-agent'
-
-# Patch hostAliases so the sync agent can resolve the KCP front-proxy
-TRAEFIK_IP=$(kubectl get svc traefik -o jsonpath='{.spec.clusterIP}')
-kubectl -n chat-ui-system patch deployment chat-ui-sync-agent \
-  --type=json -p="[{\"op\":\"add\",\"path\":\"/spec/template/spec/hostAliases\",\"value\":[{\"ip\":\"$TRAEFIK_IP\",\"hostnames\":[\"root.kcp.localhost\"]}]}]"
+```sh
+helm install chat-ui charts/chat-ui-msp-app \
+  --namespace chat-ui --create-namespace \
+  --set-file kcpKubeconfig.adminContent=$KCP
 ```
 
-Verify it's running:
+Creates the operator, sync agent, and a `pm-kcp-kubeconfig` Secret generated from the admin kubeconfig rewritten to target `root:providers:chat-ui` via KCP's in-cluster front-proxy.
 
-```bash
-kubectl -n chat-ui-system logs deploy/chat-ui-agent --tail=10
+### 3. Install the KCP-side umbrella (KCP workspace)
+
+```sh
+helm install chat-ui-pm charts/chat-ui-pm-app \
+  --kubeconfig=$KCP \
+  --kube-apiserver="$KCP_URL/clusters/root:providers:chat-ui" \
+  --namespace chat-ui --create-namespace
 ```
 
-### 5. Bind and create a ChatUIInstance via KCP
+Creates the `ui.privatellms.msp` APIExport, ProviderMetadata, and ContentConfiguration.
 
-Assumes the `root:orgs:demo` workspace and LLM APIBinding already exist from the Private LLM setup.
+## Verify
 
-```bash
-export KUBECONFIG=.secret/kcp/admin.kubeconfig
-export KCP_URL="https://localhost:8443"
+```sh
+kubectl -n chat-ui get pods
+kubectl -n chat-ui logs deploy/chat-ui-agent --tail=10
 
-# Bind to the Chat UI APIExport (see https://docs.kcp.io/kcp/main/concepts/apis/)
-kubectl apply --server="$KCP_URL/clusters/root:orgs:demo" -f - <<'EOF'
+kubectl get apiexports --kubeconfig=$KCP \
+  --server="$KCP_URL/clusters/root:providers:chat-ui"
+```
+
+## Create a ChatUIInstance (consumer side)
+
+Chat UI needs a backend endpoint. If you installed Private LLM first, point at its in-cluster service; otherwise provide your own OpenAI-compatible URL and key.
+
+```sh
+kubectl kcp workspace use root:orgs:demo --kubeconfig=$KCP   # or create it: see private-llm local install
+
+# If Private LLM is installed, resolve its service DNS:
+LLM_NS=$(kubectl get llminstances -A -o jsonpath='{.items[0].metadata.namespace}')
+LLM_SVC="demo-llm-llama.$LLM_NS.svc.cluster.local"
+
+kubectl apply --kubeconfig=$KCP --server="$KCP_URL/clusters/root:orgs:demo" -f - <<EOF
 apiVersion: apis.kcp.io/v1alpha2
 kind: APIBinding
 metadata:
@@ -130,181 +79,64 @@ spec:
     export:
       path: root:providers:chat-ui
       name: ui.privatellms.msp
-EOF
-
-# Switch to Kind to find the LLM service endpoint
-unset KUBECONFIG
-LLM_NS=$(kubectl get llminstances -A -o jsonpath='{.items[0].metadata.namespace}')
-LLM_SVC="demo-llm-llama.$LLM_NS.svc.cluster.local"
-
-# Switch back to KCP to create resources
-export KUBECONFIG=.secret/kcp/admin.kubeconfig
-
-# Create a credentials Secret pointing to the LLM backend
-kubectl apply --server="$KCP_URL/clusters/root:orgs:demo" -f - <<EOF
+---
 apiVersion: v1
 kind: Secret
 metadata:
   name: demo-llm-creds
+  namespace: default
   labels:
     apeirora.eu/llm-api-compatibility: "openai"
 type: Opaque
 stringData:
   OPENAI_API_URL: "http://$LLM_SVC:8000/v1"
   OPENAI_API_KEY: "not-needed"
-EOF
-
-# Create a ChatUIInstance
-kubectl apply --server="$KCP_URL/clusters/root:orgs:demo" -f - <<'EOF'
+---
 apiVersion: ui.privatellms.msp/v1alpha1
 kind: ChatUIInstance
 metadata:
   name: demo-chat
+  namespace: default
 spec:
   credentialsSecretRef:
     name: demo-llm-creds
   replicas: 1
 EOF
 
-kubectl get chatuiinstances --server="$KCP_URL/clusters/root:orgs:demo" -w
+kubectl get chatuiinstances --kubeconfig=$KCP \
+  --server="$KCP_URL/clusters/root:orgs:demo" -w
 ```
 
-> **Key detail:** The `OPENAI_API_URL` uses the in-cluster DNS name (`<service>.<namespace>.svc.cluster.local:<port>/v1`). Chat UI makes server-side calls to the LLM, so the URL does not need to be reachable from your browser.
+> The `OPENAI_API_URL` uses the in-cluster DNS name. Chat UI calls the LLM server-side, so the URL does not need to be reachable from your browser.
 
-### 6. Access the Chat UI
+## Access the Chat UI
 
-```bash
-unset KUBECONFIG  # target the Kind cluster
-
+```sh
 CHAT_NS=$(kubectl get chatuiinstances -A -o jsonpath='{.items[0].metadata.namespace}')
 kubectl port-forward -n "$CHAT_NS" svc/demo-chat-chatui 8080:8080
 ```
 
-Open http://localhost:8080 in your browser. The TinyLlama model appears in the model selector.
-
-The full flow: **KCP workspace** → sync agent → **Kind cluster** → operator reconciles → status synced back → **KCP / Portal UI**.
-
-## Development Mode
-
-For rapid iteration on controller code without the full Platform Mesh stack.
-
-### 1. Create a Kind cluster
-
-```bash
-kind delete cluster --name chat-ui-dev || true
-kind create cluster --name chat-ui-dev
-```
-
-### 2. Install the CRD
-
-```bash
-make install
-```
-
-### 3. Run the operator
-
-```bash
-make run
-
-# Or with custom settings
-PUBLIC_HOST=chat.localhost PUBLIC_SCHEME=http go run ./cmd/main.go
-```
-
-### 4. Apply sample resources
-
-In a separate terminal:
-
-```bash
-kubectl apply -f config/samples/ui_v1alpha1_chatuiinstance.yaml
-kubectl get chatuiinstances -w
-```
-
-> **Note**: When running locally, the readiness checks (HTTP probe, DNS resolution) will fail because there is no Ingress controller or DNS. The instance stays in `Provisioning` phase. This is expected — the reconciliation logic still works, and the Open WebUI pod is accessible via `kubectl port-forward`.
-
-### Build and test from source
-
-```bash
-# Build the image
-make docker-build IMG=chat-ui-controller:dev
-
-# Load into Kind
-kind load docker-image chat-ui-controller:dev --name chat-ui-dev
-
-# Install via Helm
-helm install chat-ui-operator charts/chat-ui-operator \
-  --namespace chat-ui --create-namespace \
-  --set image.repository=chat-ui-controller \
-  --set image.tag=dev \
-  --set image.pullPolicy=Never \
-  --set env.PUBLIC_HOST=localhost
-```
-
-## Generate CRDs and RBAC
-
-After modifying API types:
-
-```bash
-make manifests generate
-make chart
-```
-
-## Run Tests
-
-```bash
-make test       # Unit tests with envtest
-make lint       # golangci-lint
-make helm-lint  # Helm chart linting
-```
-
-## Makefile Targets Reference
-
-| Target | Description |
-|--------|-------------|
-| `make build` | Build the manager binary |
-| `make run` | Run controller locally |
-| `make test` | Run unit tests with envtest |
-| `make lint` | Run golangci-lint |
-| `make manifests` | Generate CRD and RBAC manifests |
-| `make generate` | Generate deepcopy methods |
-| `make chart` | Sync CRDs and RBAC into Helm chart |
-| `make docker-build` | Build Docker image |
-| `make docker-push` | Push Docker image |
-| `make install` | Install CRDs into current cluster |
-| `make deploy` | Deploy controller to current cluster |
-| `make helm-lint` | Lint Helm charts |
-| `make helm-package` | Package Helm charts |
+Open <http://localhost:8080>.
 
 ## Cleanup
 
-```bash
-unset KUBECONFIG
-helm uninstall chat-ui-operator -n chat-ui-system
-helm uninstall chat-ui-sync-agent -n chat-ui-system
-make uninstall
-
-kind delete cluster --name chat-ui-dev
+```sh
+helm uninstall chat-ui -n chat-ui
+helm uninstall chat-ui-pm -n chat-ui \
+  --kubeconfig=$KCP \
+  --kube-apiserver="$KCP_URL/clusters/root:providers:chat-ui"
 ```
 
 ## Troubleshooting
 
-### ChatUIInstance stays in Provisioning
+### ChatUIInstance stays in `Provisioning`
 
-The readiness check requires DNS resolution of the Ingress hostname, which won't work without an Ingress controller. The Open WebUI pod is still running — use `kubectl port-forward` to access it.
+The readiness check requires DNS resolution of the Ingress hostname, which won't work locally without an Ingress controller. The Open WebUI pod is still running — use `kubectl port-forward` to access it.
 
-### KUBECONFIG confusion
+### Sync-agent can't reach KCP
 
-The Quick Start switches between two kubeconfigs. See the [Private LLM troubleshooting](https://github.com/apeirora/showroom-msp-private-llm/blob/main/docs/installation-local.md#kubeconfig-confusion) section for details.
+See the equivalent troubleshooting section in the [Private LLM local install guide](https://github.com/apeirora/showroom-msp-private-llm/blob/main/docs/installation-local.md#sync-agent-cant-reach-kcp).
 
-### Sync agent can't connect to KCP
+## Development Mode
 
-Check the kubeconfig secret:
-
-```bash
-kubectl -n chat-ui-system get secret pm-kcp-kubeconfig -o jsonpath='{.data.kubeconfig}' | base64 -d | head -5
-```
-
-The sync agent kubeconfig should use the in-cluster front-proxy address (`frontproxy-front-proxy.platform-mesh-system.svc.cluster.local:6443`), not `localhost:8443` which is not reachable from inside Kind pods.
-
-### kubectl kcp workspace: command not found
-
-Install the [kubectl-kcp plugin](https://github.com/kcp-dev/kcp/releases). See the [Private LLM prerequisites](https://github.com/apeirora/showroom-msp-private-llm/blob/main/docs/installation-local.md#install-kubectl-kcp).
+For iterating on controller code, see [development.md](./development.md).
