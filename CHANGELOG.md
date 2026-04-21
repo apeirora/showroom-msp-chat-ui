@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.6](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.9.5...v0.9.6) (2026-04-21)
+
+
+### Reverts
+
+* **chart:** APIExport claim shape to verbs-only (no all:true) ([#64](https://github.com/apeirora/showroom-msp-chat-ui/issues/64)) ([67b80c6](https://github.com/apeirora/showroom-msp-chat-ui/commit/67b80c6cb0912f2e459bb0ebf73b21a7014b5278))
+
 ## [0.9.5](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.9.4...v0.9.5) (2026-04-21)
 
 
