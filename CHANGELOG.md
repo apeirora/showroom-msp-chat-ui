@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.7](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.9.6...v0.9.7) (2026-04-21)
+
+
+### Bug Fixes
+
+* **chart:** drop permissionClaims from chart, let sync-agent own them ([#66](https://github.com/apeirora/showroom-msp-chat-ui/issues/66)) ([70c6ad2](https://github.com/apeirora/showroom-msp-chat-ui/commit/70c6ad2ad232765ce326259af4e439ddf3a85d0f))
+
 ## [0.9.6](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.9.5...v0.9.6) (2026-04-21)
 
 
