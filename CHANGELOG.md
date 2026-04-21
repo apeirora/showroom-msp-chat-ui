@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.9.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.8.0...v0.9.0) (2026-04-21)
+
+
+### Features
+
+* **charts:** add chat-ui-msp-app and chat-ui-pm-app umbrellas ([#53](https://github.com/apeirora/showroom-msp-chat-ui/issues/53)) ([6deea0d](https://github.com/apeirora/showroom-msp-chat-ui/commit/6deea0dc9642fa352411cfb3a74189d1c17cec8c))
+* enable OCM component publishing ([973d59c](https://github.com/apeirora/showroom-msp-chat-ui/commit/973d59cdfba69a5b3756c0f70ff7a31b3acd6f0d))
+* enable OCM component publishing ([d36b086](https://github.com/apeirora/showroom-msp-chat-ui/commit/d36b086e6e000594b1ca94fec7e5c032c5f94d34))
+
+
+### Bug Fixes
+
+* add chat-ui-ui to HELM_CHARTS and fix docs imageRepository default ([a7fc91b](https://github.com/apeirora/showroom-msp-chat-ui/commit/a7fc91bdf735ce45a10a7ed81e00bafb7479769f))
+* build-local.sh chart output path and bootstrap imagePullSecrets ([dd70d2d](https://github.com/apeirora/showroom-msp-chat-ui/commit/dd70d2d8ef18ed00abee73a0714c09e77c189406))
+* correct default VERSION to 0.8.0 ([abde29e](https://github.com/apeirora/showroom-msp-chat-ui/commit/abde29ea8e9ae6839e609c632c105d47dd65af3a))
+* correct imagePullSecrets path for chat-ui chart ([2da5e3c](https://github.com/apeirora/showroom-msp-chat-ui/commit/2da5e3cdcbcaf57730cc6d62a36eb9de1235a0d6))
+* correct imagePullSecrets path in bootstrap.yaml ([616b607](https://github.com/apeirora/showroom-msp-chat-ui/commit/616b607e9667819528f5299d36e8b1f3ff910dd1))
+* **metadata:** remove tracked contact email ([#42](https://github.com/apeirora/showroom-msp-chat-ui/issues/42)) ([aa63854](https://github.com/apeirora/showroom-msp-chat-ui/commit/aa63854da28e0400a6b3fbe48468fa32ea873419))
+* OCM chart consistency improvements ([94af2f2](https://github.com/apeirora/showroom-msp-chat-ui/commit/94af2f241be8287418f7513eda50b385aaa50e09))
+* replace KRO with plain OCM resources (tested on cluster) ([d27aa62](https://github.com/apeirora/showroom-msp-chat-ui/commit/d27aa628e3a005c96271830e0e9c9cfec2851765))
+* resolve merge conflict in bootstrap.yaml (take main) ([598d776](https://github.com/apeirora/showroom-msp-chat-ui/commit/598d776f52d3ba251cad49d3ae7c6c8084768798))
+* resolve merge conflict in OCM installation docs ([2abee27](https://github.com/apeirora/showroom-msp-chat-ui/commit/2abee27f878ece4ff6b18f2e778f930023018cca))
+* **sync-agent:** bump api-syncagent to 0.5.1 for hostAliases support ([#48](https://github.com/apeirora/showroom-msp-chat-ui/issues/48)) ([d4235a2](https://github.com/apeirora/showroom-msp-chat-ui/commit/d4235a293af3bc593511a385b9226d5d315d59fc))
+* **sync-agent:** fix hostAliases format and add apiExportEndpointSliceName ([#49](https://github.com/apeirora/showroom-msp-chat-ui/issues/49)) ([4c7dbe1](https://github.com/apeirora/showroom-msp-chat-ui/commit/4c7dbe1e1568255d8706f8e97e23966746b1753b))
+* update OCM chart for controller v0.29.0 API compatibility ([2aca207](https://github.com/apeirora/showroom-msp-chat-ui/commit/2aca207ef605fd4726e1c08e712d37f666a87c6c))
+
 ## [0.8.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.7.0...v0.8.0) (2026-03-03)
 
 
