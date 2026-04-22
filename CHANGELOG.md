@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.9.7...v0.10.0) (2026-04-22)
+
+
+### Features
+
+* **ci:** build multi-arch (amd64 + arm64) operator image ([#68](https://github.com/apeirora/showroom-msp-chat-ui/issues/68)) ([404828e](https://github.com/apeirora/showroom-msp-chat-ui/commit/404828ec38a69fc1062cee9e5f85c91502fdedb3))
+
 ## [0.9.7](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.9.6...v0.9.7) (2026-04-21)
 
 
