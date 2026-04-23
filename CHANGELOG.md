@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.10.0...v0.10.1) (2026-04-23)
+
+
+### Bug Fixes
+
+* **controller:** drop grok default, add stable WEBUI_SECRET_KEY ([#71](https://github.com/apeirora/showroom-msp-chat-ui/issues/71)) ([a67063a](https://github.com/apeirora/showroom-msp-chat-ui/commit/a67063a3082f65f0d1826e0f878cfcbe7f2f5202))
+
 ## [0.10.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.9.7...v0.10.0) (2026-04-22)
 
 
