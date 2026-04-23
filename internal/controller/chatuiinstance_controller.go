@@ -353,13 +353,19 @@ func (r *ChatUIInstanceReconciler) reconcileDeployment(ctx context.Context, inst
 
 func buildDeployment(inst *uiapiv1alpha1.ChatUIInstance, labels map[string]string, replicas int32, image string, secretChecksum string) appsv1.Deployment {
 	secretName := inst.Spec.CredentialsSecretRef.Name
+	// Derive a stable 32-byte WEBUI_SECRET_KEY from the instance UID so JWT
+	// sessions survive pod restarts. Upstream Open WebUI generates an
+	// ephemeral 16-byte key when the env var is empty and logs an
+	// InsecureKeyLengthWarning.
+	webUIKeyDigest := sha256.Sum256([]byte("ui.privatellms.msp/webui-secret-key:" + string(inst.UID)))
+	webUISecretKey := hex.EncodeToString(webUIKeyDigest[:])
 	envVars := []corev1.EnvVar{
 		// Core auth + connector settings
 		{Name: "WEBUI_AUTH", Value: "false"},
+		{Name: "WEBUI_SECRET_KEY", Value: webUISecretKey},
 		{Name: "ENABLE_OPENAI_API", Value: "true"},
 		{Name: "ENABLE_OLLAMA_API", Value: "false"},
 		{Name: "ENABLE_DIRECT_CONNECTIONS", Value: "false"},
-		{Name: "DEFAULT_MODELS", Value: "x-ai/grok-code-fast-1"},
 
 		// Access & admin experience
 		{Name: "ENABLE_LOGIN_FORM", Value: "false"},
