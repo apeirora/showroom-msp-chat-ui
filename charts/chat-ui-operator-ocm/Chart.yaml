@@ -1,5 +1,5 @@
 apiVersion: v2
-name: chat-ui-operator
+name: chat-ui-operator-ocm
 description: Helm chart for Chat UI Operator OCM release manifests
 type: application
 version: 0.0.0
