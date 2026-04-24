@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.4](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.10.3...v0.10.4) (2026-04-24)
+
+
+### Bug Fixes
+
+* **controller:** reconcile Open WebUI env drift ([841328f](https://github.com/apeirora/showroom-msp-chat-ui/commit/841328f00e74aa46eb853e5507a08431b330797c))
+
 ## [0.10.3](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.10.2...v0.10.3) (2026-04-24)
 
 
