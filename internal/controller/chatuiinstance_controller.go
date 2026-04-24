@@ -485,6 +485,17 @@ func buildDeployment(inst *uiapiv1alpha1.ChatUIInstance, labels map[string]strin
 			TimeoutSeconds:   2,
 			FailureThreshold: 6,
 		},
+		StartupProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/",
+					Port: intstr.FromInt(8080),
+				},
+			},
+			PeriodSeconds:    10,
+			TimeoutSeconds:   2,
+			FailureThreshold: 60,
+		},
 		LivenessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
@@ -1066,42 +1077,52 @@ func ptrTo[T any](v T) *T {
 
 func ensureChatUIContainerProbes(c *corev1.Container) bool {
 	updated := false
-	if c.ReadinessProbe == nil ||
-		c.ReadinessProbe.HTTPGet == nil ||
-		c.ReadinessProbe.HTTPGet.Path != "/" ||
-		c.ReadinessProbe.HTTPGet.Port.IntValue() != 8080 {
-		c.ReadinessProbe = &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/",
-					Port: intstr.FromInt(8080),
-				},
-			},
-			PeriodSeconds:    5,
-			TimeoutSeconds:   2,
-			FailureThreshold: 6,
-		}
+	readinessProbe := chatUIHTTPProbe(5, 2, 6)
+	if !probesEqual(c.ReadinessProbe, readinessProbe) {
+		c.ReadinessProbe = readinessProbe
 		updated = true
 	}
-	if c.LivenessProbe == nil ||
-		c.LivenessProbe.HTTPGet == nil ||
-		c.LivenessProbe.HTTPGet.Path != "/" ||
-		c.LivenessProbe.HTTPGet.Port.IntValue() != 8080 {
-		c.LivenessProbe = &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/",
-					Port: intstr.FromInt(8080),
-				},
-			},
-			InitialDelaySeconds: 20,
-			PeriodSeconds:       10,
-			TimeoutSeconds:      2,
-			FailureThreshold:    6,
-		}
+	startupProbe := chatUIHTTPProbe(10, 2, 60)
+	if !probesEqual(c.StartupProbe, startupProbe) {
+		c.StartupProbe = startupProbe
+		updated = true
+	}
+	livenessProbe := chatUIHTTPProbe(10, 2, 6)
+	livenessProbe.InitialDelaySeconds = 20
+	if !probesEqual(c.LivenessProbe, livenessProbe) {
+		c.LivenessProbe = livenessProbe
 		updated = true
 	}
 	return updated
+}
+
+func chatUIHTTPProbe(periodSeconds, timeoutSeconds, failureThreshold int32) *corev1.Probe {
+	return &corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/",
+				Port: intstr.FromInt(8080),
+			},
+		},
+		PeriodSeconds:    periodSeconds,
+		TimeoutSeconds:   timeoutSeconds,
+		FailureThreshold: failureThreshold,
+	}
+}
+
+func probesEqual(actual, desired *corev1.Probe) bool {
+	if actual == nil || desired == nil {
+		return actual == desired
+	}
+	if actual.HTTPGet == nil || desired.HTTPGet == nil {
+		return actual.HTTPGet == desired.HTTPGet
+	}
+	return actual.HTTPGet.Path == desired.HTTPGet.Path &&
+		actual.HTTPGet.Port == desired.HTTPGet.Port &&
+		actual.InitialDelaySeconds == desired.InitialDelaySeconds &&
+		actual.PeriodSeconds == desired.PeriodSeconds &&
+		actual.TimeoutSeconds == desired.TimeoutSeconds &&
+		actual.FailureThreshold == desired.FailureThreshold
 }
 
 func copyStringMap(in map[string]string) map[string]string {
