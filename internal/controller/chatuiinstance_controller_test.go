@@ -208,6 +208,63 @@ func TestEnsureChatUIContainerProbes(t *testing.T) {
 	}
 }
 
+func TestReconcileDeploymentUpdatesManagedOpenWebUIEnv(t *testing.T) {
+	inst := &uiapiv1alpha1.ChatUIInstance{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: testNamespace, UID: "test-uid"},
+		Spec: uiapiv1alpha1.ChatUIInstanceSpec{
+			CredentialsSecretRef: corev1.LocalObjectReference{Name: "new-token"},
+			Replicas:             1,
+		},
+	}
+	replicas := int32(1)
+	existing := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo-chatui", Namespace: testNamespace},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Name:  "open-webui",
+						Image: "ghcr.io/open-webui/open-webui:latest",
+						Env: []corev1.EnvVar{
+							{Name: "WEBUI_AUTH", Value: "true"},
+							{Name: "WEBUI_ADMIN_EMAIL", Value: "admin@localhost"},
+							{
+								Name: "OPENAI_API_KEY",
+								ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{
+									LocalObjectReference: corev1.LocalObjectReference{Name: "old-token"},
+									Key:                  "OPENAI_API_KEY",
+								}},
+							},
+						},
+					}},
+				},
+			},
+		},
+	}
+	r := newChatUITestReconciler(nil, noopDNSChecker, existing)
+
+	if err := r.reconcileDeployment(context.Background(), inst, uiLabels(inst.Name), 1, "ghcr.io/open-webui/open-webui:latest", "checksum"); err != nil {
+		t.Fatalf("reconcileDeployment returned error: %v", err)
+	}
+
+	var updated appsv1.Deployment
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: "demo-chatui"}, &updated); err != nil {
+		t.Fatalf("failed to get updated deployment: %v", err)
+	}
+	env := updated.Spec.Template.Spec.Containers[0].Env
+	if got := envValue(env, "WEBUI_AUTH"); got != "false" {
+		t.Fatalf("expected WEBUI_AUTH=false, got %q", got)
+	}
+	if got := envValue(env, "WEBUI_ADMIN_EMAIL"); got != "" {
+		t.Fatalf("expected stale WEBUI_ADMIN_EMAIL to be removed, got %q", got)
+	}
+	keyRef := envSecretName(env, "OPENAI_API_KEY")
+	if keyRef != "new-token" {
+		t.Fatalf("expected OPENAI_API_KEY to reference new-token, got %q", keyRef)
+	}
+}
+
 func newChatUITestReconciler(checker ServiceHealthChecker, dnsChecker DNSChecker, objects ...client.Object) *ChatUIInstanceReconciler {
 	scheme := runtime.NewScheme()
 	_ = clientgoscheme.AddToScheme(scheme)
@@ -225,6 +282,24 @@ func newChatUITestReconciler(checker ServiceHealthChecker, dnsChecker DNSChecker
 		ServiceHealthChecker: checker,
 		DNSChecker:           dnsChecker,
 	}
+}
+
+func envValue(env []corev1.EnvVar, name string) string {
+	for _, item := range env {
+		if item.Name == name {
+			return item.Value
+		}
+	}
+	return ""
+}
+
+func envSecretName(env []corev1.EnvVar, name string) string {
+	for _, item := range env {
+		if item.Name == name && item.ValueFrom != nil && item.ValueFrom.SecretKeyRef != nil {
+			return item.ValueFrom.SecretKeyRef.Name
+		}
+	}
+	return ""
 }
 
 func readyChatUIDeployment() *appsv1.Deployment {
