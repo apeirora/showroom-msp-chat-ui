@@ -9,12 +9,11 @@ Install the Chat UI provider on a local [Platform Mesh](https://github.com/platf
 - [Helm](https://helm.sh/) 3.14+
 - An OpenAI-compatible endpoint to point Chat UI at. The Platform Mesh tutorial installs [Private LLM](https://github.com/apeirora/showroom-msp-private-llm/blob/main/docs/installation-local.md) first; alternatively, supply your own endpoint via a Secret (see [Create a ChatUIInstance](#create-a-chatuiinstance-consumer-side)).
 
-Export the admin kubeconfig path and KCP URL (only needed once per shell):
+Export the admin kubeconfig path (only needed once per shell):
 
 ```sh
 export HELM_CHARTS_DIR="$(pwd)"       # assumes CWD is the platform-mesh/helm-charts repo
 export KCP="$HELM_CHARTS_DIR/.secret/kcp/admin.kubeconfig"
-export KCP_URL="https://localhost:8443"
 ```
 
 ## Install
@@ -22,9 +21,9 @@ export KCP_URL="https://localhost:8443"
 ### 1. Create the provider workspace on KCP
 
 ```sh
-kubectl kcp workspace create providers --type=root:providers --ignore-existing --kubeconfig=$KCP
-kubectl kcp workspace use root:providers --kubeconfig=$KCP
-kubectl kcp workspace create chat-ui --type=root:provider --ignore-existing --kubeconfig=$KCP
+kubectl kcp workspace create providers --type=root:providers --ignore-existing
+kubectl kcp workspace use root:providers
+kubectl kcp workspace create chat-ui --type=root:provider --ignore-existing
 ```
 
 ### 2. Pull chart dependencies
@@ -54,8 +53,6 @@ Creates the operator, sync agent, and a `pm-kcp-kubeconfig` Secret generated fro
 
 ```sh
 helm install chat-ui-pm charts/chat-ui-pm-app \
-  --kubeconfig=$KCP \
-  --kube-apiserver="$KCP_URL/clusters/root:providers:chat-ui" \
   --namespace chat-ui --create-namespace
 ```
 
@@ -68,8 +65,8 @@ kubectl -n chat-ui get pods
 kubectl -n chat-ui rollout status deployment/chat-ui --timeout=3m
 kubectl -n chat-ui logs deploy/chat-ui --tail=10
 
-kubectl get apiexport ui.privatellms.msp --kubeconfig=$KCP \
-  --server="$KCP_URL/clusters/root:providers:chat-ui" \
+kubectl kcp workspace use root:providers:chat-ui
+kubectl get apiexport ui.privatellms.msp \
   -o jsonpath='{range .spec.resources[*]}{.name}{"\n"}{end}'
 ```
 
@@ -80,13 +77,13 @@ The APIExport resources must include `chatuiinstances`.
 Chat UI needs a backend endpoint. If you installed Private LLM first, point at its in-cluster service; otherwise provide your own OpenAI-compatible URL and key.
 
 ```sh
-kubectl kcp workspace use root:orgs:demo --kubeconfig=$KCP   # or create it: see private-llm local install
+kubectl kcp workspace use root:orgs:demo   # or create it: see private-llm local install
 
 # If Private LLM is installed, resolve its service DNS:
 LLM_NS=$(kubectl get llminstances -A -o jsonpath='{.items[0].metadata.namespace}')
 LLM_SVC="demo-llm-llama.$LLM_NS.svc.cluster.local"
 
-kubectl apply --kubeconfig=$KCP --server="$KCP_URL/clusters/root:orgs:demo" -f - <<EOF
+kubectl apply -f - <<EOF
 apiVersion: apis.kcp.io/v1alpha2
 kind: APIBinding
 metadata:
@@ -120,8 +117,7 @@ spec:
   replicas: 1
 EOF
 
-kubectl get chatuiinstances --kubeconfig=$KCP \
-  --server="$KCP_URL/clusters/root:orgs:demo" -w
+kubectl get chatuiinstances -w
 ```
 
 > The `OPENAI_API_URL` uses the in-cluster DNS name. Chat UI calls the LLM server-side, so the URL does not need to be reachable from your browser.
@@ -138,10 +134,9 @@ Open <http://localhost:8080>.
 ## Cleanup
 
 ```sh
+kubectl kcp workspace use root:providers:chat-ui
 helm uninstall chat-ui -n chat-ui
-helm uninstall chat-ui-pm -n chat-ui \
-  --kubeconfig=$KCP \
-  --kube-apiserver="$KCP_URL/clusters/root:providers:chat-ui"
+helm uninstall chat-ui-pm -n chat-ui
 ```
 
 ## Troubleshooting
