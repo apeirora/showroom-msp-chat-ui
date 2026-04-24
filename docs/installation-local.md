@@ -27,7 +27,20 @@ kubectl kcp workspace use root:providers --kubeconfig=$KCP
 kubectl kcp workspace create chat-ui --type=root:provider --ignore-existing --kubeconfig=$KCP
 ```
 
-### 2. Install the MSP-side umbrella (Kind cluster)
+### 2. Pull chart dependencies
+
+When installing from a source checkout, pull the nested sync-agent dependency
+before the umbrella chart. Helm does not recursively update dependencies for
+`file://` subcharts.
+
+```sh
+helm dependency update charts/chat-ui-sync-agent
+helm dependency update charts/chat-ui-operator
+helm dependency update charts/chat-ui-msp-app
+helm dependency update charts/chat-ui-pm-app
+```
+
+### 3. Install the MSP-side umbrella (Kind cluster)
 
 ```sh
 helm install chat-ui charts/chat-ui-msp-app \
@@ -37,7 +50,7 @@ helm install chat-ui charts/chat-ui-msp-app \
 
 Creates the operator, sync agent, and a `pm-kcp-kubeconfig` Secret generated from the admin kubeconfig rewritten to target `root:providers:chat-ui` via KCP's in-cluster front-proxy.
 
-### 3. Install the KCP-side umbrella (KCP workspace)
+### 4. Install the KCP-side umbrella (KCP workspace)
 
 ```sh
 helm install chat-ui-pm charts/chat-ui-pm-app \
@@ -52,11 +65,15 @@ Creates the `ui.privatellms.msp` APIExport, ProviderMetadata, and ContentConfigu
 
 ```sh
 kubectl -n chat-ui get pods
-kubectl -n chat-ui logs deploy/chat-ui-agent --tail=10
+kubectl -n chat-ui rollout status deployment/chat-ui --timeout=3m
+kubectl -n chat-ui logs deploy/chat-ui --tail=10
 
-kubectl get apiexports --kubeconfig=$KCP \
-  --server="$KCP_URL/clusters/root:providers:chat-ui"
+kubectl get apiexport ui.privatellms.msp --kubeconfig=$KCP \
+  --server="$KCP_URL/clusters/root:providers:chat-ui" \
+  -o jsonpath='{range .spec.resources[*]}{.name}{"\n"}{end}'
 ```
+
+The APIExport resources must include `chatuiinstances`.
 
 ## Create a ChatUIInstance (consumer side)
 
