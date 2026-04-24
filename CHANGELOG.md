@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.5](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.10.4...v0.10.5) (2026-04-24)
+
+
+### Bug Fixes
+
+* **release:** keep OCM resources by reference ([9f603e9](https://github.com/apeirora/showroom-msp-chat-ui/commit/9f603e9ca2fc7f3b6b11bc0ef0183b8dcb7d3cf4))
+
 ## [0.10.4](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.10.3...v0.10.4) (2026-04-24)
 
 
