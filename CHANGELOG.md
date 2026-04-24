@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.6](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.10.5...v0.10.6) (2026-04-24)
+
+
+### Bug Fixes
+
+* **release:** make OCM publish non-blocking ([d78e5e1](https://github.com/apeirora/showroom-msp-chat-ui/commit/d78e5e12de5ebb9881581ec5c80f719722986cd3))
+
 ## [0.10.5](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.10.4...v0.10.5) (2026-04-24)
 
 
