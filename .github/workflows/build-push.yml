@@ -229,7 +229,7 @@ jobs:
           owner="${GITHUB_REPOSITORY_OWNER,,}"
           ocm add componentversions --create --file dist/ctf .ocm/component-constructor.yaml \
             VERSION="${VERSION}" GITHUB_REPOSITORY_OWNER="${owner}" IMAGE_TAG="${VERSION}" CHART_TAG="${VERSION}"
-          ocm transfer commontransportarchive dist/ctf "$OCM_REPOSITORY" --copy-resources --overwrite
+          ocm transfer commontransportarchive dist/ctf "$OCM_REPOSITORY" --overwrite
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
