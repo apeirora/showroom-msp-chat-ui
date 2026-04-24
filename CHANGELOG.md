@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.3](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.10.2...v0.10.3) (2026-04-24)
+
+
+### Bug Fixes
+
+* **controller:** Tolerate slow Open WebUI startup ([9eb3a55](https://github.com/apeirora/showroom-msp-chat-ui/commit/9eb3a55d2031aa297a317106363ff9b3cdecd18b))
+
 ## [0.10.2](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.10.1...v0.10.2) (2026-04-24)
 
 
