@@ -190,8 +190,21 @@ func TestEnsureChatUIContainerProbes(t *testing.T) {
 	if c.LivenessProbe == nil || c.LivenessProbe.HTTPGet == nil || c.LivenessProbe.HTTPGet.Path != "/" {
 		t.Fatalf("liveness probe was not configured correctly")
 	}
+	if c.StartupProbe == nil || c.StartupProbe.HTTPGet == nil || c.StartupProbe.HTTPGet.Path != "/" {
+		t.Fatalf("startup probe was not configured correctly")
+	}
+	if c.StartupProbe.FailureThreshold != 60 {
+		t.Fatalf("expected startup probe to allow slow first boot, got failure threshold %d", c.StartupProbe.FailureThreshold)
+	}
 	if ensureChatUIContainerProbes(c) {
 		t.Fatalf("expected second ensure call to report no changes")
+	}
+	c.LivenessProbe.InitialDelaySeconds = 1
+	if !ensureChatUIContainerProbes(c) {
+		t.Fatalf("expected drifted probe timing to be corrected")
+	}
+	if c.LivenessProbe.InitialDelaySeconds != 20 {
+		t.Fatalf("expected liveness initial delay to be restored, got %d", c.LivenessProbe.InitialDelaySeconds)
 	}
 }
 
