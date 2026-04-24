@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -295,6 +296,8 @@ func (r *ChatUIInstanceReconciler) reconcileDeployment(ctx context.Context, inst
 		return nil
 	}
 	updated := false
+	desired := buildDeployment(inst, labels, replicas, image, secretChecksum)
+	desiredContainer := desired.Spec.Template.Spec.Containers[0]
 
 	// Check if checksum annotation needs update (triggers pod rollout)
 	currentChecksum := ""
@@ -317,7 +320,6 @@ func (r *ChatUIInstanceReconciler) reconcileDeployment(ctx context.Context, inst
 		existing.Spec.Replicas = ptrTo(replicas)
 		updated = true
 	}
-	desiredSecretName := strings.TrimSpace(inst.Spec.CredentialsSecretRef.Name)
 	for i := range existing.Spec.Template.Spec.Containers {
 		c := &existing.Spec.Template.Spec.Containers[i]
 		if c.Name != "open-webui" {
@@ -327,22 +329,13 @@ func (r *ChatUIInstanceReconciler) reconcileDeployment(ctx context.Context, inst
 			c.Image = image
 			updated = true
 		}
+		if !reflect.DeepEqual(c.Env, desiredContainer.Env) {
+			c.Env = desiredContainer.Env
+			updated = true
+			logger.Info("updated managed Open WebUI environment", "deployment", deployName)
+		}
 		if ensureChatUIContainerProbes(c) {
 			updated = true
-		}
-		// Update secret references if credentialsSecretRef.name changed
-		for j := range c.Env {
-			env := &c.Env[j]
-			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
-				if env.ValueFrom.SecretKeyRef.Name != desiredSecretName {
-					logger.Info("updating secret reference in env var",
-						"envVar", env.Name,
-						"oldSecret", env.ValueFrom.SecretKeyRef.Name,
-						"newSecret", desiredSecretName)
-					env.ValueFrom.SecretKeyRef.Name = desiredSecretName
-					updated = true
-				}
-			}
 		}
 	}
 	if !updated {
