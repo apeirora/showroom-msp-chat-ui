@@ -67,6 +67,10 @@ jobs:
           tags: |
             ${{ steps.meta.outputs.image }}:${{ steps.vars.outputs.version }}
             ${{ steps.meta.outputs.image }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.vars.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
