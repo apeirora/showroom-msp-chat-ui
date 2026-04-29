@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.7](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.10.6...v0.10.7) (2026-04-29)
+
+
+### Bug Fixes
+
+* **go:** rename module path to github.com/apeirora/showroom-msp-chat-ui ([a904c90](https://github.com/apeirora/showroom-msp-chat-ui/commit/a904c90243c95e054f0f6838f52827c80ea8426b))
+
 ## [0.10.6](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.10.5...v0.10.6) (2026-04-24)
 
 
