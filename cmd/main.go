@@ -44,8 +44,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 
-	uiapiv1alpha1 "github.com/example/chat-ui/api/v1alpha1"
-	uictrl "github.com/example/chat-ui/internal/controller"
+	uiapiv1alpha1 "github.com/apeirora/showroom-msp-chat-ui/api/v1alpha1"
+	uictrl "github.com/apeirora/showroom-msp-chat-ui/internal/controller"
 )
 
 var (
