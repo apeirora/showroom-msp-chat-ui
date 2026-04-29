@@ -48,7 +48,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
-	uiapiv1alpha1 "github.com/example/chat-ui/api/v1alpha1"
+	uiapiv1alpha1 "github.com/apeirora/showroom-msp-chat-ui/api/v1alpha1"
 )
 
 // ChatUIInstanceReconciler reconciles a ChatUIInstance object
@@ -220,7 +220,7 @@ func (r *ChatUIInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 }
 
 func (r *ChatUIInstanceReconciler) startTracing(ctx context.Context) (context.Context, trace.Span) {
-	tracer := otel.Tracer("github.com/example/chat-ui/internal/controller")
+	tracer := otel.Tracer("github.com/apeirora/showroom-msp-chat-ui/internal/controller")
 	ctx, span := tracer.Start(ctx, "ChatUIInstanceReconciler.Reconcile", trace.WithAttributes())
 	logger := log.FromContext(ctx)
 	if sc := span.SpanContext(); sc.IsValid() {

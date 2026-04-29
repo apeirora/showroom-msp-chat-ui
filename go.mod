@@ -1,4 +1,4 @@
-module github.com/example/chat-ui
+module github.com/apeirora/showroom-msp-chat-ui
 
 go 1.24.0
 
