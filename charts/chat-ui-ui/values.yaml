@@ -1,5 +1,4 @@
-PUBLIC_HOST: "localhost"
-PUBLIC_SCHEME: "http"
+publicHost: "localhost"
 
 tls:
   secretName: ""
@@ -29,4 +28,3 @@ ui:
 branding:
   sidebar:
     title: "Chat UI"
-

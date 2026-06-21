@@ -212,7 +212,7 @@ YQ ?= yq
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.3.0
-CONTROLLER_TOOLS_VERSION ?= v0.14.0
+CONTROLLER_TOOLS_VERSION ?= v0.20.1
 ENVTEST_VERSION ?= release-0.17
 GOLANGCI_LINT_VERSION ?= v2.5.0
 YQ ?= yq
@@ -347,4 +347,3 @@ helm-package: chart ## package all helm charts
 	helm package charts/chat-ui-operator -d dist
 	helm package charts/chat-ui-pm-integration -d dist
 	helm package charts/chat-ui-sync-agent -d dist
-
