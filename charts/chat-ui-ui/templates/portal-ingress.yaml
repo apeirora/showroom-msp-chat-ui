@@ -17,7 +17,7 @@ spec:
   ingressClassName: {{ .Values.traefik.ingressClass.name }}
   {{- end }}
   rules:
-    - host: {{ .Values.PUBLIC_HOST | quote }}
+    - host: {{ .Values.publicHost | quote }}
       http:
         paths:
           - path: {{ .Values.ui.contentPath | default "/pm-content.json" | quote }}
@@ -30,8 +30,7 @@ spec:
   {{- if .Values.tls.secretName }}
   tls:
     - hosts:
-        - {{ .Values.PUBLIC_HOST | quote }}
+        - {{ .Values.publicHost | quote }}
       secretName: {{ .Values.tls.secretName }}
   {{- end }}
 {{- end }}
-
