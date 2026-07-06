@@ -28,11 +28,10 @@
                     },
                     "context": {
                         "resourceDefinition": {
-                            "group": "ui.privatellms.msp",
+                            "apiGroup": "ui_privatellms_msp",
                             "version": "v1alpha1",
-                            "plural": "ChatUIInstances",
-                            "singular": "chatuiinstance",
-                            "kind": "ChatUIInstance",
+                            "entityCollection": "ChatUIInstances",
+                            "entity": "ChatUIInstance",
                             "scope": "Namespaced",
                             "namespace": null,
                             "ui": {
