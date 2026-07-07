@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.8](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.10.7...v0.10.8) (2026-07-07)
+
+
+### Bug Fixes
+
+* **chart:** migrate pm-content resourceDefinition to portal-ui-lib &gt;=0.43 schema ([#95](https://github.com/apeirora/showroom-msp-chat-ui/issues/95)) ([437fea9](https://github.com/apeirora/showroom-msp-chat-ui/commit/437fea9b7162628ab4dd1f29d2d03ecca0a2510b))
+
 ## [0.10.7](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.10.6...v0.10.7) (2026-06-21)
 
 
