@@ -1,0 +1,26 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Chat UI Instance API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/apis/ui.privatellms.msp/v1alpha1/namespaces/{namespace}/chatuiinstances": {
+      "post": {
+        "operationId": "createChatUIInstance",
+        "summary": "Create a Chat UI instance",
+        "parameters": [
+          {
+            "name": "namespace",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "201": { "description": "Created" }
+        }
+      }
+    }
+  }
+}

@@ -10,5 +10,16 @@ metadata:
 data:
   pm-content.json: |-
 {{ tpl (.Files.Get "files/pm-content.json") . | indent 4 }}
+  ord-configuration.json: |-
+{{ .Files.Get "files/ord/configuration.json" | indent 4 }}
+  ord-chat-ui.json: |-
+{{ .Files.Get "files/ord/chat-ui.json" | indent 4 }}
+  ord-openai-chat-contract.json: |-
+{{ .Files.Get "files/ord/openai-chat-contract.json" | indent 4 }}
+  ord-chat-ui.oas3.json: |-
+{{ .Files.Get "files/ord/chat-ui.oas3.json" | indent 4 }}
+  ord-openai-chat-completions.oas3.json: |-
+{{ .Files.Get "files/ord/openai-chat-completions.oas3.json" | indent 4 }}
+  nginx-default.conf: |-
+{{ .Files.Get "files/ord/default.conf" | indent 4 }}
 {{- end }}
-

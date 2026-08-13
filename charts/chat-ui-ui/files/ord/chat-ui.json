@@ -1,0 +1,79 @@
+{
+  "$schema": "https://open-resource-discovery.org/spec-v1/interfaces/Document.schema.json",
+  "openResourceDiscovery": "1.16",
+  "perspective": "system-version",
+  "describedSystemVersion": { "version": "0.10.8" },
+  "vendors": [
+    {
+      "ordId": "apeirora:vendor:apeirora:",
+      "title": "ApeiroRA"
+    }
+  ],
+  "products": [
+    {
+      "ordId": "apeirora.eu:product:chat-ui:",
+      "title": "Chat UI",
+      "shortDescription": "A managed chat interface for OpenAI-compatible backends",
+      "vendor": "apeirora:vendor:apeirora:"
+    }
+  ],
+  "packages": [
+    {
+      "ordId": "apeirora.eu:package:chat-ui:v1",
+      "title": "Chat UI Service",
+      "shortDescription": "Chat UI instances provisioned through Platform Mesh",
+      "description": "A managed web chat interface that connects to one OpenAI-compatible LLM backend.",
+      "version": "1.0.0",
+      "vendor": "apeirora:vendor:apeirora:",
+      "partOfProducts": ["apeirora.eu:product:chat-ui:"],
+      "tags": ["ai", "chat", "showroom"]
+    }
+  ],
+  "apiResources": [
+    {
+      "ordId": "apeirora.eu:apiResource:chat-ui-instance:v1",
+      "title": "Chat UI Instance API",
+      "shortDescription": "Kubernetes API for lifecycle management of Chat UI instances",
+      "description": "The Kubernetes REST surface used by Platform Mesh to create and manage Chat UI instances.",
+      "version": "1.0.0",
+      "visibility": "public",
+      "releaseStatus": "active",
+      "partOfPackage": "apeirora.eu:package:chat-ui:v1",
+      "apiProtocol": "rest",
+      "resourceDefinitions": [
+        {
+          "type": "openapi-v3",
+          "mediaType": "application/json",
+          "url": "/ord/definitions/chat-ui.oas3.json",
+          "accessStrategies": [{ "type": "open" }]
+        }
+      ]
+    }
+  ],
+  "integrationDependencies": [
+    {
+      "ordId": "apeirora.eu:integrationDependency:llm-backend:v1",
+      "title": "LLM backend",
+      "shortDescription": "An OpenAI-compatible chat completions backend",
+      "description": "Chat UI needs one API that implements the OpenAI-compatible Chat Completions contract.",
+      "version": "1.0.0",
+      "visibility": "public",
+      "releaseStatus": "active",
+      "partOfPackage": "apeirora.eu:package:chat-ui:v1",
+      "mandatory": true,
+      "aspects": [
+        {
+          "title": "Chat completions",
+          "mandatory": true,
+          "supportMultipleProviders": false,
+          "apiResources": [
+            {
+              "ordId": "apeirora.eu:apiResource:openai-chat-completions:v1",
+              "minVersion": "1.0.0"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

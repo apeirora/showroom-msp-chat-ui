@@ -13,6 +13,7 @@ on:
       - '**/*.go'
       - 'charts/**'
       - '.github/workflows/ci.yml'
+      - 'hack/validate-ord.mjs'
 
 permissions:
   contents: read
@@ -20,6 +21,26 @@ permissions:
   pull-requests: write
 
 jobs:
+  ord-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate ORD and OpenAPI assets
+        run: |
+          npm install --no-save --ignore-scripts \
+            @open-resource-discovery/specification@1.16.3 \
+            @apidevtools/swagger-parser@12.1.0 \
+            ajv@8.20.0 \
+            ajv-formats@3.0.1
+          node hack/validate-ord.mjs charts/chat-ui-ui/files/ord
+
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
@@ -162,4 +183,3 @@ jobs:
           echo "chart_dir=${out_dir}" >> "$GITHUB_OUTPUT"
           echo "chart_name=${chart_name}" >> "$GITHUB_OUTPUT"
           echo "::endgroup::"
-

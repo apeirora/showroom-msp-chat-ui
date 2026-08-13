@@ -3,6 +3,7 @@
 set -euo pipefail
 
 chart_dir="${1:-charts/chat-ui-ui}"
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
@@ -35,9 +36,21 @@ helm template chat-ui-ui "$chart_dir" \
 assert_contains "$public_host_render" 'host: "chat-ui.example.com"'
 assert_contains "$public_host_render" '- "chat-ui.example.com"'
 assert_not_contains "$public_host_render" 'host: "localhost"'
+assert_contains "$public_host_render" 'path: "/.well-known/open-resource-discovery"'
+assert_contains "$public_host_render" 'path: "/ord/"'
+assert_contains "$public_host_render" 'mountPath: /usr/share/nginx/html/ord/documents/chat-ui.json'
+assert_contains "$public_host_render" 'add_header Access-Control-Allow-Origin "*" always;'
 
 default_render="$tmpdir/default.yaml"
 helm template chat-ui-ui "$chart_dir" \
   --namespace chat-ui \
   > "$default_render"
 assert_contains "$default_render" 'host: "localhost"'
+
+metadata_render="$tmpdir/provider-metadata.yaml"
+helm template chat-ui-pm "$repo_root/charts/chat-ui-pm-integration" \
+  --set publicHost=chat-ui.example.com \
+  --set publicScheme=https \
+  > "$metadata_render"
+assert_contains "$metadata_render" 'displayName: ORD'
+assert_contains "$metadata_render" 'configUrl: "https://chat-ui.example.com/.well-known/open-resource-discovery"'

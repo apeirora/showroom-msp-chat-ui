@@ -1,0 +1,43 @@
+{
+  "$schema": "https://open-resource-discovery.org/spec-v1/interfaces/Document.schema.json",
+  "openResourceDiscovery": "1.16",
+  "perspective": "system-independent",
+  "vendors": [
+    {
+      "ordId": "apeirora:vendor:apeirora:",
+      "title": "ApeiroRA"
+    }
+  ],
+  "packages": [
+    {
+      "ordId": "apeirora.eu:package:openai-compatible-contracts:v1",
+      "title": "OpenAI-compatible contracts",
+      "shortDescription": "Shared interface contracts used by the ApeiroRA Showroom",
+      "description": "Abstract contracts used for provider-neutral discovery and matching.",
+      "version": "1.0.0",
+      "vendor": "apeirora:vendor:apeirora:"
+    }
+  ],
+  "apiResources": [
+    {
+      "ordId": "apeirora.eu:apiResource:openai-chat-completions:v1",
+      "title": "OpenAI-compatible Chat Completions",
+      "shortDescription": "Abstract contract for OpenAI-compatible chat completions",
+      "description": "Implementations declare this contract through compatibleWith.",
+      "version": "1.0.0",
+      "abstract": true,
+      "visibility": "public",
+      "releaseStatus": "active",
+      "partOfPackage": "apeirora.eu:package:openai-compatible-contracts:v1",
+      "apiProtocol": "rest",
+      "resourceDefinitions": [
+        {
+          "type": "openapi-v3",
+          "mediaType": "application/json",
+          "url": "/ord/definitions/openai-chat-completions.oas3.json",
+          "accessStrategies": [{ "type": "open" }]
+        }
+      ]
+    }
+  ]
+}
