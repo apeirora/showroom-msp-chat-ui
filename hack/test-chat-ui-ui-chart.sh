@@ -40,6 +40,7 @@ assert_contains "$public_host_render" 'path: "/.well-known/open-resource-discove
 assert_contains "$public_host_render" 'path: "/ord/"'
 assert_contains "$public_host_render" 'mountPath: /usr/share/nginx/html/ord/documents/chat-ui.json'
 assert_contains "$public_host_render" 'add_header Access-Control-Allow-Origin "*" always;'
+assert_contains "$public_host_render" 'types { }'
 assert_contains "$public_host_render" 'default_type "application/json;charset=UTF-8";'
 assert_contains "$public_host_render" 'add_header Cache-Control "public, max-age=300" always;'
 
