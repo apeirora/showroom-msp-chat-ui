@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.11.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.10.8...v0.11.0) (2026-08-13)
+
+
+### Features
+
+* **ord:** Publish Chat UI discovery metadata ([#98](https://github.com/apeirora/showroom-msp-chat-ui/issues/98)) ([98cdf00](https://github.com/apeirora/showroom-msp-chat-ui/commit/98cdf003914f5607fb4f40c6c05fb2c5455e6d38))
+
+
+### Bug Fixes
+
+* **chart:** force ORD JSON media type ([#101](https://github.com/apeirora/showroom-msp-chat-ui/issues/101)) ([a6ecb82](https://github.com/apeirora/showroom-msp-chat-ui/commit/a6ecb82e6b39d849eb679ad0df8fed1f1efea3e4))
+* **ord:** Enforce provider transport contract ([#100](https://github.com/apeirora/showroom-msp-chat-ui/issues/100)) ([e29f597](https://github.com/apeirora/showroom-msp-chat-ui/commit/e29f5971264edb82bd63907ab58c578c6ddb57bf))
+
 ## [0.10.8](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.10.7...v0.10.8) (2026-07-07)
 
 

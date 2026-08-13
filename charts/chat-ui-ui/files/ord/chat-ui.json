@@ -2,7 +2,9 @@
   "$schema": "https://open-resource-discovery.org/spec-v1/interfaces/Document.schema.json",
   "openResourceDiscovery": "1.16",
   "perspective": "system-version",
-  "describedSystemVersion": { "version": "0.10.8" },
+  "describedSystemVersion": {
+    "version": "0.11.0"
+  },
   "vendors": [
     {
       "ordId": "apeirora:vendor:apeirora:",
@@ -25,8 +27,14 @@
       "description": "A managed web chat interface that connects to one OpenAI-compatible LLM backend.",
       "version": "1.0.0",
       "vendor": "apeirora:vendor:apeirora:",
-      "partOfProducts": ["apeirora.eu:product:chat-ui:"],
-      "tags": ["ai", "chat", "showroom"]
+      "partOfProducts": [
+        "apeirora.eu:product:chat-ui:"
+      ],
+      "tags": [
+        "ai",
+        "chat",
+        "showroom"
+      ]
     }
   ],
   "apiResources": [
@@ -45,7 +53,11 @@
           "type": "openapi-v3",
           "mediaType": "application/json",
           "url": "/ord/definitions/chat-ui.oas3.json",
-          "accessStrategies": [{ "type": "open" }]
+          "accessStrategies": [
+            {
+              "type": "open"
+            }
+          ]
         }
       ]
     }
