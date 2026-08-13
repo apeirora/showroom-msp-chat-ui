@@ -1,0 +1,18 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "OpenAI-compatible Chat Completions",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/v1/chat/completions": {
+      "post": {
+        "operationId": "createChatCompletion",
+        "summary": "Create a model response for a chat conversation",
+        "responses": {
+          "200": { "description": "Completion created" }
+        }
+      }
+    }
+  }
+}

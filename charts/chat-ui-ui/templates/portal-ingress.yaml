@@ -27,6 +27,20 @@ spec:
                 name: {{ .Release.Name }}-portal
                 port:
                   number: {{ .Values.ui.service.port }}
+          - path: "/.well-known/open-resource-discovery"
+            pathType: Exact
+            backend:
+              service:
+                name: {{ .Release.Name }}-portal
+                port:
+                  number: {{ .Values.ui.service.port }}
+          - path: "/ord/"
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-portal
+                port:
+                  number: {{ .Values.ui.service.port }}
   {{- if .Values.tls.secretName }}
   tls:
     - hosts:

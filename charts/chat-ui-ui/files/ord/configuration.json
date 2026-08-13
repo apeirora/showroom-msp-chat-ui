@@ -1,0 +1,17 @@
+{
+  "$schema": "https://open-resource-discovery.org/spec-v1/interfaces/Configuration.schema.json",
+  "openResourceDiscoveryV1": {
+    "documents": [
+      {
+        "url": "/ord/documents/chat-ui.json",
+        "perspective": "system-version",
+        "accessStrategies": [{ "type": "open" }]
+      },
+      {
+        "url": "/ord/documents/openai-chat-contract.json",
+        "perspective": "system-independent",
+        "accessStrategies": [{ "type": "open" }]
+      }
+    ]
+  }
+}

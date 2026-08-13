@@ -39,6 +39,24 @@ spec:
             - name: portal-config
               mountPath: /usr/share/nginx/html/pm-content.json
               subPath: pm-content.json
+            - name: portal-config
+              mountPath: /usr/share/nginx/html/ord/configuration.json
+              subPath: ord-configuration.json
+            - name: portal-config
+              mountPath: /usr/share/nginx/html/ord/documents/chat-ui.json
+              subPath: ord-chat-ui.json
+            - name: portal-config
+              mountPath: /usr/share/nginx/html/ord/documents/openai-chat-contract.json
+              subPath: ord-openai-chat-contract.json
+            - name: portal-config
+              mountPath: /usr/share/nginx/html/ord/definitions/chat-ui.oas3.json
+              subPath: ord-chat-ui.oas3.json
+            - name: portal-config
+              mountPath: /usr/share/nginx/html/ord/definitions/openai-chat-completions.oas3.json
+              subPath: ord-openai-chat-completions.oas3.json
+            - name: portal-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: nginx-default.conf
           resources:
             {{- toYaml .Values.ui.resources | nindent 12 }}
       volumes:
@@ -48,5 +66,16 @@ spec:
             items:
               - key: pm-content.json
                 path: pm-content.json
+              - key: ord-configuration.json
+                path: ord-configuration.json
+              - key: ord-chat-ui.json
+                path: ord-chat-ui.json
+              - key: ord-openai-chat-contract.json
+                path: ord-openai-chat-contract.json
+              - key: ord-chat-ui.oas3.json
+                path: ord-chat-ui.oas3.json
+              - key: ord-openai-chat-completions.oas3.json
+                path: ord-openai-chat-completions.oas3.json
+              - key: nginx-default.conf
+                path: nginx-default.conf
 {{- end }}
-
