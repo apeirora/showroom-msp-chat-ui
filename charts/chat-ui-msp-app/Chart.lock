@@ -1,12 +1,12 @@
 dependencies:
 - name: chat-ui-operator
   repository: file://../chat-ui-operator
-  version: 0.11.0
+  version: 0.12.0-rc
 - name: chat-ui-sync-agent
   repository: file://../chat-ui-sync-agent
-  version: 0.11.0
+  version: 0.12.0-rc
 - name: chat-ui-ui
   repository: file://../chat-ui-ui
   version: 0.1.0
-digest: sha256:d636818f06802ed5c1280dac6371dd88616cf4beaff636983921b1efef71e207
-generated: "2026-08-16T00:33:00.109853+02:00"
+digest: sha256:ec1870814f2d506cd4a582cd2102689e5c3446b8eaca51afe40fe2bc85e7fb04
+generated: "2026-08-16T00:55:36.59904+02:00"
