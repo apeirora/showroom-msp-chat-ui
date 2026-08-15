@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.11.0...v0.12.0) (2026-08-15)
+
+
+### Features
+
+* add ORD provider details extension ([#102](https://github.com/apeirora/showroom-msp-chat-ui/issues/102)) ([aa3cf39](https://github.com/apeirora/showroom-msp-chat-ui/commit/aa3cf39199b7a1ca268fb81b023e6df856edf1cf))
+
 ## [0.11.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.10.8...v0.11.0) (2026-08-13)
 
 
