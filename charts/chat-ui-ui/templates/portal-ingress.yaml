@@ -41,6 +41,13 @@ spec:
                 name: {{ .Release.Name }}-portal
                 port:
                   number: {{ .Values.ui.service.port }}
+          - path: "/ui-extensions/"
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-portal
+                port:
+                  number: {{ .Values.ui.service.port }}
   {{- if .Values.tls.secretName }}
   tls:
     - hosts:

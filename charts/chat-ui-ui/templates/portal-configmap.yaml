@@ -20,6 +20,12 @@ data:
 {{ .Files.Get "files/ord/chat-ui.oas3.json" | indent 4 }}
   ord-openai-chat-completions.oas3.json: |-
 {{ .Files.Get "files/ord/openai-chat-completions.oas3.json" | indent 4 }}
+  ord-renderer-index.html: |-
+{{ .Files.Get "files/ui-extensions/ord/index.html" | indent 4 }}
+  ord-renderer-styles.css: |-
+{{ .Files.Get "files/ui-extensions/ord/styles.css" | indent 4 }}
+  ord-renderer.js: |-
+{{ .Files.Get "files/ui-extensions/ord/renderer.js" | indent 4 }}
   nginx-default.conf: |-
 {{ .Files.Get "files/ord/default.conf" | indent 4 }}
 {{- end }}
