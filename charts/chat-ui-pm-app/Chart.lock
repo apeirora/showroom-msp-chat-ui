@@ -1,6 +1,6 @@
 dependencies:
 - name: chat-ui-pm-integration
   repository: file://../chat-ui-pm-integration
-  version: 0.11.0
-digest: sha256:d8bf9fc19b4e301c030f226d7d541418d9771cbf3f9c6feb9211cd1d0e6cacaf
-generated: "2026-08-16T00:33:01.306541+02:00"
+  version: 0.12.0-rc
+digest: sha256:acf9ad2ae2c1c536f6b985dd5532cc5466031cab98030333c620d1cf4f9885d9
+generated: "2026-08-16T00:55:37.688195+02:00"
