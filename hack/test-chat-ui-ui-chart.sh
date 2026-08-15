@@ -38,11 +38,14 @@ assert_contains "$public_host_render" '- "chat-ui.example.com"'
 assert_not_contains "$public_host_render" 'host: "localhost"'
 assert_contains "$public_host_render" 'path: "/.well-known/open-resource-discovery"'
 assert_contains "$public_host_render" 'path: "/ord/"'
+assert_contains "$public_host_render" 'path: "/ui-extensions/"'
 assert_contains "$public_host_render" 'mountPath: /usr/share/nginx/html/ord/documents/chat-ui.json'
 assert_contains "$public_host_render" 'add_header Access-Control-Allow-Origin "*" always;'
 assert_contains "$public_host_render" 'types { }'
 assert_contains "$public_host_render" 'default_type "application/json;charset=UTF-8";'
 assert_contains "$public_host_render" 'add_header Cache-Control "public, max-age=300" always;'
+assert_contains "$public_host_render" 'mountPath: /usr/share/nginx/html/ui-extensions/ord/index.html'
+assert_contains "$public_host_render" 'platform-mesh.provider-details.navigate.v1'
 
 default_render="$tmpdir/default.yaml"
 helm template chat-ui-ui "$chart_dir" \
@@ -57,3 +60,4 @@ helm template chat-ui-pm "$repo_root/charts/chat-ui-pm-integration" \
   > "$metadata_render"
 assert_contains "$metadata_render" 'displayName: ORD'
 assert_contains "$metadata_render" 'configUrl: "https://chat-ui.example.com/.well-known/open-resource-discovery"'
+assert_contains "$metadata_render" 'url: "https://chat-ui.example.com/ui-extensions/ord/"'
