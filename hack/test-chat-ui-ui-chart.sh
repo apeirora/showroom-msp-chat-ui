@@ -60,4 +60,5 @@ helm template chat-ui-pm "$repo_root/charts/chat-ui-pm-integration" \
   > "$metadata_render"
 assert_contains "$metadata_render" 'displayName: ORD'
 assert_contains "$metadata_render" 'configUrl: "https://chat-ui.example.com/.well-known/open-resource-discovery"'
+assert_contains "$metadata_render" 'detailViewExtensions:'
 assert_contains "$metadata_render" 'url: "https://chat-ui.example.com/ui-extensions/ord/"'
