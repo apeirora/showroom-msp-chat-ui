@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.1-rc](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.12.0-rc...v0.12.1-rc) (2026-08-17)
+
+
+### Bug Fixes
+
+* rename provider detail view extension field ([#107](https://github.com/apeirora/showroom-msp-chat-ui/issues/107)) ([4812f95](https://github.com/apeirora/showroom-msp-chat-ui/commit/4812f9549cc37c91361960b6f9decd0ce21e6037))
+
 ## [0.12.0-rc](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.11.0...v0.12.0-rc) (2026-08-15)
 
 
