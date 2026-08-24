@@ -17,23 +17,21 @@ main {
   padding: 0.125rem 0 0.75rem;
 }
 
-h2 {
-  margin: 0 0 0.625rem;
-  font-size: 1rem;
-  line-height: 1.4;
-}
-
-.compatibility {
+.panel {
   border: 1px solid #d5dadd;
   border-radius: 0.5rem;
   overflow: hidden;
 }
 
-.compatibility + .compatibility {
+.match + .match {
+  margin-top: 1rem;
+}
+
+.panel + .panel {
   margin-top: 0.75rem;
 }
 
-.requirement {
+.panel__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -42,13 +40,12 @@ h2 {
   background: #f7f8f9;
 }
 
-.requirement__title {
+.panel__title {
   min-width: 0;
 }
 
 .eyebrow,
 .meta,
-.contract,
 .loading,
 .empty,
 .error {
@@ -63,41 +60,38 @@ h2 {
   text-transform: uppercase;
 }
 
-.requirement h3 {
+.panel__name {
   margin: 0;
   font-size: 1rem;
+  font-weight: 700;
 }
 
-.contract {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.45rem 0.875rem;
+.api-panel__id {
+  display: block;
+  padding: 0.6rem 0.875rem;
   border-top: 1px solid #e5e7e9;
   color: #556b82;
-}
-
-.contract__details {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.contract__details .eyebrow {
-  margin: 0;
-}
-
-.contract__title {
-  color: #1d2d3e;
-  font-size: 0.875rem;
-}
-
-.contract code {
   overflow-wrap: anywhere;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.75rem;
+}
+
+.api-panel__link {
+  color: #0064d9;
+  text-decoration: none;
+}
+
+.api-panel__link::after {
+  content: " ↗";
+}
+
+.api-panel__link:hover {
+  text-decoration: underline;
+}
+
+.api-panel__link:focus-visible {
+  outline: 2px solid #0064d9;
+  outline-offset: -2px;
 }
 
 .results {
@@ -125,6 +119,13 @@ h2 {
   border-top: 1px solid #e5e7e9;
 }
 
+.result__title {
+  display: flex;
+  min-width: 12rem;
+  flex: 1 1 18rem;
+  flex-direction: column;
+}
+
 .result:hover,
 .result:focus-visible {
   background: #f5fafe;
@@ -135,11 +136,31 @@ h2 {
   outline-offset: -2px;
 }
 
-.result__title {
-  display: flex;
-  min-width: 12rem;
-  flex: 1 1 18rem;
-  flex-direction: column;
+.provider-visual {
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 2.25rem;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #d5dadd;
+  border-radius: 0.5rem;
+  background: #fff;
+}
+
+.provider-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.provider-visual--fallback {
+  border-color: #b8d7f4;
+  background: #eaf5ff;
+  color: #074d70;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .meta {
@@ -188,29 +209,33 @@ h2 {
 }
 
 @media (max-width: 38rem) {
-  .contract {
+  .panel__header {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .contract .badges {
+  .panel__header .badges {
     justify-content: flex-start;
   }
 
   .result {
-    align-items: flex-start;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 2.25rem minmax(0, 1fr) auto;
+    align-items: center;
   }
 
   .result__title {
-    min-width: calc(100% - 2rem);
+    min-width: 0;
+    grid-column: 2 / 4;
   }
 
-  .badges {
+  .result > .badges {
+    grid-column: 2;
     justify-content: flex-start;
   }
 
-  .arrow {
-    margin-left: auto;
+  .result > .arrow {
+    grid-column: 3;
+    grid-row: 2;
   }
 }

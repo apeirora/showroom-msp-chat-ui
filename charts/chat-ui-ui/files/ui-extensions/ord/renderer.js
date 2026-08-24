@@ -3,6 +3,7 @@ const NAVIGATE = "platform-mesh.provider-details.navigate.v1";
 const RESIZE = "platform-mesh.provider-details.resize.v1";
 const MAX_DOCUMENTS = 10;
 const MAX_BYTES = 2 * 1024 * 1024;
+const DOCUMENT_URL = Symbol("documentUrl");
 
 export function parseProviderData(data) {
   if (!data) return {};
@@ -30,6 +31,54 @@ export function configUrlFor(provider) {
   }
 }
 
+export function providerIconUrl(provider, prefersDark = false) {
+  const icon = provider?.providerMetadata?.spec?.icon;
+  const preferred = prefersDark ? icon?.dark : icon?.light;
+  const fallback = prefersDark ? icon?.light : icon?.dark;
+  return [
+    preferred?.url,
+    preferred?.data,
+    fallback?.url,
+    fallback?.data,
+  ]
+    .map(safeImageUrl)
+    .find(Boolean);
+}
+
+export function resourceDefinitionUrlFor(api, baseUrl) {
+  const definition = (api?.resourceDefinitions ?? []).find(
+    (candidate) =>
+      typeof candidate.url === "string" &&
+      (candidate.accessStrategies ?? []).some(
+        (strategy) => strategy.type === "open",
+      ),
+  );
+  if (!definition || !baseUrl) return undefined;
+  try {
+    const url = new URL(definition.url, baseUrl);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function safeImageUrl(value) {
+  if (typeof value !== "string") return undefined;
+  if (
+    /^data:image\/(?:gif|jpeg|png|svg\+xml|webp);base64,[a-z0-9+/=\s]+$/i.test(
+      value,
+    )
+  ) {
+    return value;
+  }
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" ? parsed.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function matchesVersion(minVersion, maxVersion) {
   if (!minVersion) return true;
   if (!maxVersion) return false;
@@ -46,7 +95,10 @@ export function matchProviders(
 ) {
   const apiResources = new Map(
     currentDocuments.flatMap((document) =>
-      (document.apiResources ?? []).map((api) => [api.ordId, api]),
+      (document.apiResources ?? []).map((api) => [
+        api.ordId,
+        { api, documentUrl: document[DOCUMENT_URL] },
+      ]),
     ),
   );
   const dependencies = currentDocuments.flatMap(
@@ -58,7 +110,8 @@ export function matchProviders(
         dependency,
         aspect,
         resource,
-        requiredApi: apiResources.get(resource.ordId),
+        requiredApi: apiResources.get(resource.ordId)?.api,
+        requiredApiDocumentUrl: apiResources.get(resource.ordId)?.documentUrl,
       })),
     ),
   );
@@ -98,7 +151,9 @@ export function groupCandidatesByProvider(candidates) {
       byName.set(candidate.provider.name, group);
       groups.push(group);
     }
-    group.apis.push(candidate.api);
+    if (!group.apis.some((api) => api.ordId === candidate.api.ordId)) {
+      group.apis.push(candidate.api);
+    }
   }
   return groups;
 }
@@ -120,13 +175,15 @@ export async function loadProviderDocuments(provider, fetchJSON = fetchJson) {
 
   return Promise.all(
     openDocuments.map(async (document) => {
+      const documentUrl = new URL(document.url, configUrl).href;
       const result = await fetchJSON(
-        new URL(document.url, configUrl).href,
+        documentUrl,
         MAX_BYTES,
       );
       if (result?.openResourceDiscovery !== "1.16") {
         throw new Error("Unsupported ORD version");
       }
+      Object.defineProperty(result, DOCUMENT_URL, { value: documentUrl });
       return result;
     }),
   );
@@ -214,53 +271,33 @@ export function render(context) {
     );
     if (!matches.length) return;
 
-    app.append(element("h2", "", "ORD matches"));
     for (const match of matches) {
       const candidateGroups = groupCandidatesByProvider(match.candidates);
-      const compatibility = element("section", "compatibility");
-      const requirement = element("header", "requirement");
-      const requirementTitle = element("div", "requirement__title");
-      requirementTitle.append(
+      const matchSection = element("div", "match");
+
+      const apiSection = element("section", "panel api-panel");
+      const apiHeader = element("header", "panel__header");
+      const apiTitle = element("div", "panel__title");
+      apiTitle.append(
+        element(
+          "h2",
+          "eyebrow",
+          match.dependency.mandatory === false ? "Optional API" : "Required API",
+        ),
         element(
           "p",
-          "eyebrow",
-          match.dependency.mandatory ? "Required" : "Optional",
-        ),
-        element(
-          "h3",
-          "",
-          match.dependency.title || match.aspect.title || "Required API",
-        ),
-      );
-      const providerLabel =
-        candidateGroups.length === 1 ? "provider" : "providers";
-      requirement.append(
-        requirementTitle,
-        element(
-          "span",
-          "count",
-          `${candidateGroups.length} ${providerLabel}`,
-        ),
-      );
-      const contract = element("div", "contract");
-      const contractDetails = element("div", "contract__details");
-      contractDetails.append(
-        element("span", "eyebrow", "Required API"),
-        element(
-          "strong",
-          "contract__title",
+          "panel__name",
           match.requiredApi?.title || match.aspect.title || "API",
         ),
-        element("code", "", match.resource.ordId),
       );
-      const contractBadges = element("div", "badges");
+      const apiBadges = element("div", "badges");
       if (match.requiredApi?.apiProtocol) {
-        contractBadges.append(
+        apiBadges.append(
           element("span", "badge", match.requiredApi.apiProtocol.toUpperCase()),
         );
       }
       if (match.resource.minVersion) {
-        contractBadges.append(
+        apiBadges.append(
           element(
             "span",
             "badge badge--neutral",
@@ -268,8 +305,51 @@ export function render(context) {
           ),
         );
       }
-      contract.append(contractDetails, contractBadges);
-      compatibility.append(requirement, contract);
+      apiHeader.append(apiTitle, apiBadges);
+      const definitionUrl = resourceDefinitionUrlFor(
+        match.requiredApi,
+        match.requiredApiDocumentUrl || configUrlFor(context.currentProvider),
+      );
+      const apiId = definitionUrl
+        ? element("a", "api-panel__id api-panel__link", match.resource.ordId)
+        : element("code", "api-panel__id", match.resource.ordId);
+      if (definitionUrl) {
+        apiId.href = definitionUrl;
+        apiId.target = "_blank";
+        apiId.rel = "noopener noreferrer";
+        apiId.title = "Open API definition in a new tab";
+        apiId.setAttribute(
+          "aria-label",
+          `${match.resource.ordId} — open API definition in a new tab`,
+        );
+      }
+      apiSection.append(
+        apiHeader,
+        apiId,
+      );
+
+      const servicesSection = element("section", "panel services-panel");
+      const servicesHeader = element("header", "panel__header");
+      const servicesTitle = element("div", "panel__title");
+      servicesTitle.append(
+        element("h2", "eyebrow", "Supported services"),
+        element(
+          "p",
+          "panel__name",
+          match.dependency.title || match.aspect.title || "Services",
+        ),
+      );
+      const providerLabel =
+        candidateGroups.length === 1 ? "provider" : "providers";
+      servicesHeader.append(
+        servicesTitle,
+        element(
+          "span",
+          "count",
+          `${candidateGroups.length} ${providerLabel}`,
+        ),
+      );
+      servicesSection.append(servicesHeader);
 
       const resultsSection = element("div", "results");
       if (!candidateGroups.length) {
@@ -278,8 +358,9 @@ export function render(context) {
       for (const candidateGroup of candidateGroups) {
         resultsSection.append(renderCandidate(candidateGroup));
       }
-      compatibility.append(resultsSection);
-      app.append(compatibility);
+      servicesSection.append(resultsSection);
+      matchSection.append(apiSection, servicesSection);
+      app.append(matchSection);
     }
   });
 }
@@ -290,9 +371,11 @@ function renderCandidate({ provider, apis }) {
   card.addEventListener("click", () =>
     sendMessage(NAVIGATE, { providerName: provider.name }),
   );
+  const displayName = provider.providerMetadata.spec.displayName;
+  card.append(renderProviderIcon(provider, displayName));
   const title = element("span", "result__title");
   title.append(
-    element("strong", "", provider.providerMetadata.spec.displayName),
+    element("strong", "", displayName),
     element(
       "span",
       "meta",
@@ -311,6 +394,37 @@ function renderCandidate({ provider, apis }) {
   arrow.setAttribute("aria-hidden", "true");
   card.append(title, badges, arrow);
   return card;
+}
+
+function renderProviderIcon(provider, displayName) {
+  const visual = element("span", "provider-visual");
+  visual.setAttribute("aria-hidden", "true");
+  const initials = (displayName || provider.name)
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+  const showFallback = () => {
+    visual.replaceChildren();
+    visual.classList.add("provider-visual--fallback");
+    text(visual, initials || "MSP");
+  };
+  const iconUrl = providerIconUrl(provider);
+  if (iconUrl) {
+    const icon = element("img", "provider-icon");
+    icon.src = iconUrl;
+    icon.alt = "";
+    icon.loading = "lazy";
+    icon.decoding = "async";
+    icon.referrerPolicy = "no-referrer";
+    icon.addEventListener("error", showFallback, { once: true });
+    visual.append(icon);
+    return visual;
+  }
+  showFallback();
+  return visual;
 }
 
 let targetOrigin = "*";
