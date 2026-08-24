@@ -82,6 +82,21 @@ export function matchProviders(
   }));
 }
 
+export function groupCandidatesByProvider(candidates) {
+  const groups = [];
+  const byName = new Map();
+  for (const candidate of candidates) {
+    let group = byName.get(candidate.provider.name);
+    if (!group) {
+      group = { provider: candidate.provider, apis: [] };
+      byName.set(candidate.provider.name, group);
+      groups.push(group);
+    }
+    group.apis.push(candidate.api);
+  }
+  return groups;
+}
+
 export async function loadProviderDocuments(provider, fetchJSON = fetchJson) {
   const configUrl = configUrlFor(provider);
   if (!configUrl) return [];
@@ -156,7 +171,7 @@ function element(tag, className, value) {
   return node;
 }
 
-function render(context) {
+export function render(context) {
   const app = document.querySelector("#app");
   if (!app) return;
   app.replaceChildren();
@@ -193,78 +208,86 @@ function render(context) {
     );
     if (!matches.length) return;
 
-    app.append(element("h2", "", "Required implementations"));
+    app.append(element("h2", "", "ORD matches"));
     for (const match of matches) {
-      const requirement = element("section", "requirement");
-      requirement.append(
+      const candidateGroups = groupCandidatesByProvider(match.candidates);
+      const compatibility = element("section", "compatibility");
+      const requirement = element("header", "requirement");
+      const requirementTitle = element("div", "requirement__title");
+      requirementTitle.append(
         element(
           "p",
           "eyebrow",
-          match.dependency.mandatory ? "Mandatory" : "Optional",
+          match.dependency.mandatory ? "Required" : "Optional",
         ),
         element(
           "h3",
           "",
           match.dependency.title || match.aspect.title || "Required API",
         ),
-        element("p", "contract", match.resource.ordId),
       );
+      const providerLabel =
+        candidateGroups.length === 1 ? "provider" : "providers";
+      requirement.append(
+        requirementTitle,
+        element(
+          "span",
+          "count",
+          `${candidateGroups.length} ${providerLabel}`,
+        ),
+      );
+      const contract = element("div", "contract");
+      contract.append(element("code", "", match.resource.ordId));
       if (match.resource.minVersion) {
-        requirement.append(
-          element("p", "meta", `Minimum version ${match.resource.minVersion}`),
-        );
-      }
-      app.append(requirement);
-
-      const resultsSection = element("section", "results");
-      if (!match.candidates.length) {
-        resultsSection.append(
+        contract.append(
           element(
-            "p",
-            "empty",
-            "No compatible offering was found in this marketplace.",
+            "span",
+            "badge badge--neutral",
+            `v${match.resource.minVersion}+`,
           ),
         );
       }
-      for (const candidate of match.candidates) {
-        resultsSection.append(renderCandidate(candidate));
+      compatibility.append(requirement, contract);
+
+      const resultsSection = element("div", "results");
+      if (!candidateGroups.length) {
+        resultsSection.append(element("p", "empty", "No compatible providers"));
       }
-      app.append(resultsSection);
+      for (const candidateGroup of candidateGroups) {
+        resultsSection.append(renderCandidate(candidateGroup));
+      }
+      compatibility.append(resultsSection);
+      app.append(compatibility);
     }
-    app.append(
-      element(
-        "p",
-        "notice",
-        "Compatibility is declared by provider ORD metadata; it is not a runtime conformance check.",
-      ),
-    );
   });
 }
 
-function renderCandidate({ provider, api }) {
-  const card = element("article", "result");
-  const head = element("div", "result__head");
-  const title = element("div");
-  title.append(
-    element("h3", "", provider.providerMetadata.spec.displayName),
-    element("p", "meta", api.title || api.ordId),
-  );
-  const button = element("button", "", "View details");
-  button.type = "button";
-  button.addEventListener("click", () =>
+function renderCandidate({ provider, apis }) {
+  const card = element("button", "result");
+  card.type = "button";
+  card.addEventListener("click", () =>
     sendMessage(NAVIGATE, { providerName: provider.name }),
   );
-  head.append(title, button);
-  card.append(head);
+  const title = element("span", "result__title");
+  title.append(
+    element("strong", "", provider.providerMetadata.spec.displayName),
+    element(
+      "span",
+      "meta",
+      apis.map((api) => api.title || api.ordId).join(" · "),
+    ),
+  );
   const badges = element("div", "badges");
-  for (const value of [
-    "Contract match",
-    api.apiProtocol?.toUpperCase(),
-    api.version,
-  ].filter(Boolean)) {
+  const badgeValues = new Set(
+    apis.flatMap((api) => [api.apiProtocol?.toUpperCase(), api.version]),
+  );
+  for (const value of badgeValues) {
+    if (!value) continue;
     badges.append(element("span", "badge", value));
   }
-  card.append(badges);
+  const arrow = element("span", "arrow", "›");
+  arrow.setAttribute("aria-hidden", "true");
+  card.append(title, badges, arrow);
   return card;
 }
 
