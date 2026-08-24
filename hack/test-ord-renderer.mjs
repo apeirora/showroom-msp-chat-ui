@@ -10,6 +10,7 @@ const source = await readFile(
 );
 const {
   configUrlFor,
+  groupCandidatesByProvider,
   loadProviderDocuments,
   matchProviders,
   matchesVersion,
@@ -108,3 +109,77 @@ assert.deepEqual(
   matches[0].candidates.map(({ provider, api }) => [provider.name, api.ordId]),
   [["private-llm", "example:apiResource:implementation:v1"]],
 );
+
+const manyProviders = Array.from({ length: 12 }, (_, index) => ({
+  provider: {
+    name: `provider-${index}`,
+    providerMetadata: { spec: { displayName: `Provider ${index}` } },
+  },
+  documents: [
+    {
+      apiResources: [
+        {
+          ordId: `example:apiResource:implementation-${index}:v1`,
+          visibility: "public",
+          compatibleWith: [
+            { ordId: "example:apiResource:chat:v1", maxVersion: "1.0" },
+          ],
+        },
+      ],
+    },
+  ],
+}));
+
+const orderedMatches = matchProviders(
+  current,
+  currentDocuments(),
+  manyProviders,
+);
+assert.deepEqual(
+  orderedMatches[0].candidates.map(({ provider }) => provider.name),
+  manyProviders.map(({ provider }) => provider.name),
+);
+
+const groupedCandidates = groupCandidatesByProvider([
+  orderedMatches[0].candidates[0],
+  {
+    provider: orderedMatches[0].candidates[0].provider,
+    api: { ordId: "example:apiResource:second-implementation:v1" },
+  },
+  orderedMatches[0].candidates[1],
+]);
+assert.deepEqual(
+  groupedCandidates.map(({ provider, apis }) => [
+    provider.name,
+    apis.map(({ ordId }) => ordId),
+  ]),
+  [
+    [
+      "provider-0",
+      [
+        "example:apiResource:implementation-0:v1",
+        "example:apiResource:second-implementation:v1",
+      ],
+    ],
+    ["provider-1", ["example:apiResource:implementation-1:v1"]],
+  ],
+);
+
+function currentDocuments() {
+  return [
+    {
+      integrationDependencies: [
+        {
+          title: "LLM backend",
+          aspects: [
+            {
+              apiResources: [
+                { ordId: "example:apiResource:chat:v1", minVersion: "1.0.0" },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ];
+}
