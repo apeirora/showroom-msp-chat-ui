@@ -2,8 +2,8 @@ apiVersion: v2
 name: chat-ui-sync-agent
 description: Deploy the KCP Sync Agent plus published-resource wrappers for chat-ui.
 type: application
-version: 0.12.2-rc
-appVersion: 0.12.2-rc
+version: 0.12.3-rc
+appVersion: 0.12.3-rc
 dependencies:
   - name: api-syncagent
     alias: syncAgentOperator

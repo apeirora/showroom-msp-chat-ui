@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.3-rc](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.12.2-rc...v0.12.3-rc) (2026-08-24)
+
+
+### Bug Fixes
+
+* **metadata:** track provider chart revision ([#111](https://github.com/apeirora/showroom-msp-chat-ui/issues/111)) ([3d2f3b3](https://github.com/apeirora/showroom-msp-chat-ui/commit/3d2f3b3792d922419ec9a3790f1e6d8eceb262e5))
+
 ## [0.12.2-rc](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.12.1-rc...v0.12.2-rc) (2026-08-24)
 
 
