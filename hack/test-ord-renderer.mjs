@@ -64,6 +64,14 @@ const matches = matchProviders(
   current,
   [
     {
+      apiResources: [
+        {
+          ordId: "example:apiResource:chat:v1",
+          title: "OpenAI-compatible Chat Completions",
+          apiProtocol: "rest",
+          abstract: true,
+        },
+      ],
       integrationDependencies: [
         {
           title: "LLM backend",
@@ -105,6 +113,12 @@ const matches = matchProviders(
 );
 
 assert.equal(matches.length, 1);
+assert.deepEqual(matches[0].requiredApi, {
+  ordId: "example:apiResource:chat:v1",
+  title: "OpenAI-compatible Chat Completions",
+  apiProtocol: "rest",
+  abstract: true,
+});
 assert.deepEqual(
   matches[0].candidates.map(({ provider, api }) => [provider.name, api.ordId]),
   [["private-llm", "example:apiResource:implementation:v1"]],

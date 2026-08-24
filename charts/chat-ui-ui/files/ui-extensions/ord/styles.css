@@ -78,6 +78,22 @@ h2 {
   color: #556b82;
 }
 
+.contract__details {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.contract__details .eyebrow {
+  margin: 0;
+}
+
+.contract__title {
+  color: #1d2d3e;
+  font-size: 0.875rem;
+}
+
 .contract code {
   overflow-wrap: anywhere;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -172,6 +188,15 @@ h2 {
 }
 
 @media (max-width: 38rem) {
+  .contract {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .contract .badges {
+    justify-content: flex-start;
+  }
+
   .result {
     align-items: flex-start;
     flex-wrap: wrap;
