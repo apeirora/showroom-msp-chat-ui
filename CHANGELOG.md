@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.6-rc](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.12.5-rc...v0.12.6-rc) (2026-08-24)
+
+
+### Bug Fixes
+
+* show required API details in ORD matches ([#117](https://github.com/apeirora/showroom-msp-chat-ui/issues/117)) ([8627dd4](https://github.com/apeirora/showroom-msp-chat-ui/commit/8627dd4fbc1004be1a26d46b69ade74b44d87bcd))
+
 ## [0.12.5-rc](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.12.4-rc...v0.12.5-rc) (2026-08-24)
 
 
