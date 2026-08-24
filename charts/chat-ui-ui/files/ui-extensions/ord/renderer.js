@@ -44,6 +44,11 @@ export function matchProviders(
   currentDocuments,
   providerDocuments,
 ) {
+  const apiResources = new Map(
+    currentDocuments.flatMap((document) =>
+      (document.apiResources ?? []).map((api) => [api.ordId, api]),
+    ),
+  );
   const dependencies = currentDocuments.flatMap(
     (document) => document.integrationDependencies ?? [],
   );
@@ -53,6 +58,7 @@ export function matchProviders(
         dependency,
         aspect,
         resource,
+        requiredApi: apiResources.get(resource.ordId),
       })),
     ),
   );
@@ -237,9 +243,24 @@ export function render(context) {
         ),
       );
       const contract = element("div", "contract");
-      contract.append(element("code", "", match.resource.ordId));
+      const contractDetails = element("div", "contract__details");
+      contractDetails.append(
+        element("span", "eyebrow", "Required API"),
+        element(
+          "strong",
+          "contract__title",
+          match.requiredApi?.title || match.aspect.title || "API",
+        ),
+        element("code", "", match.resource.ordId),
+      );
+      const contractBadges = element("div", "badges");
+      if (match.requiredApi?.apiProtocol) {
+        contractBadges.append(
+          element("span", "badge", match.requiredApi.apiProtocol.toUpperCase()),
+        );
+      }
       if (match.resource.minVersion) {
-        contract.append(
+        contractBadges.append(
           element(
             "span",
             "badge badge--neutral",
@@ -247,6 +268,7 @@ export function render(context) {
           ),
         );
       }
+      contract.append(contractDetails, contractBadges);
       compatibility.append(requirement, contract);
 
       const resultsSection = element("div", "results");
