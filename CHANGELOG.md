@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.2-rc](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.12.1-rc...v0.12.2-rc) (2026-08-24)
+
+
+### Bug Fixes
+
+* **release:** roll provider metadata after schema update ([#109](https://github.com/apeirora/showroom-msp-chat-ui/issues/109)) ([30e5e23](https://github.com/apeirora/showroom-msp-chat-ui/commit/30e5e234d9109048d8cfb3f520a12b55bf6d2643))
+
 ## [0.12.1-rc](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.12.0-rc...v0.12.1-rc) (2026-08-17)
 
 
