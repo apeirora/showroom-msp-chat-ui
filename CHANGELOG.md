@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.4-rc](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.12.3-rc...v0.12.4-rc) (2026-08-24)
+
+
+### Bug Fixes
+
+* version provider detail extension URL ([#113](https://github.com/apeirora/showroom-msp-chat-ui/issues/113)) ([1051a11](https://github.com/apeirora/showroom-msp-chat-ui/commit/1051a113624582ce8de3070f1a1e04ff23234a50))
+
 ## [0.12.3-rc](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.12.2-rc...v0.12.3-rc) (2026-08-24)
 
 
