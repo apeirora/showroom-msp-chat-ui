@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.5-rc](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.12.4-rc...v0.12.5-rc) (2026-08-24)
+
+
+### Bug Fixes
+
+* compact ORD provider matches ([#115](https://github.com/apeirora/showroom-msp-chat-ui/issues/115)) ([1e641f8](https://github.com/apeirora/showroom-msp-chat-ui/commit/1e641f813a3296fc4529caf1ad2b2fe4f87b75ea))
+
 ## [0.12.4-rc](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.12.3-rc...v0.12.4-rc) (2026-08-24)
 
 
