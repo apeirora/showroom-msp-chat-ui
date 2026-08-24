@@ -15,6 +15,8 @@ const {
   matchProviders,
   matchesVersion,
   parseProviderData,
+  providerIconUrl,
+  resourceDefinitionUrlFor,
 } = await import(
   `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`
 );
@@ -40,7 +42,88 @@ assert.deepEqual(
   },
 );
 assert.equal(configUrlFor(current), "https://chat.example/ord");
+const providerWithIcon = {
+  providerMetadata: {
+    spec: {
+      icon: {
+        light: { data: "data:image/png;base64,aGVsbG8=" },
+        dark: { url: "https://example.test/dark.svg" },
+      },
+    },
+  },
+};
+assert.equal(
+  providerIconUrl(providerWithIcon),
+  "data:image/png;base64,aGVsbG8=",
+);
+assert.equal(
+  providerIconUrl(providerWithIcon, true),
+  "https://example.test/dark.svg",
+);
+assert.equal(
+  providerIconUrl({
+    providerMetadata: { spec: { icon: { light: { data: "javascript:x" } } } },
+  }),
+  undefined,
+);
+assert.equal(
+  providerIconUrl({
+    providerMetadata: {
+      spec: {
+        icon: {
+          light: {
+            url: "http://example.test/icon.svg",
+            data: "data:image/png;base64,aGVsbG8=",
+          },
+        },
+      },
+    },
+  }),
+  "data:image/png;base64,aGVsbG8=",
+);
 assert.equal(matchesVersion("1.0.0", "1.0"), true);
+assert.equal(
+  resourceDefinitionUrlFor(
+    {
+      resourceDefinitions: [
+        {
+          url: "../definitions/chat.oas3.json",
+          accessStrategies: [{ type: "open" }],
+        },
+      ],
+    },
+    "https://example.test/ord/documents/chat.json",
+  ),
+  "https://example.test/ord/definitions/chat.oas3.json",
+);
+assert.equal(
+  resourceDefinitionUrlFor(
+    {
+      resourceDefinitions: [
+        {
+          url: "javascript:alert(1)",
+          accessStrategies: [{ type: "open" }],
+        },
+      ],
+    },
+    "https://example.test/ord/document.json",
+  ),
+  undefined,
+);
+assert.equal(
+  resourceDefinitionUrlFor(
+    {
+      resourceDefinitions: [
+        {
+          url: "/private/openapi.json",
+          accessStrategies: [{ type: "oauth2" }],
+        },
+      ],
+    },
+    "https://example.test/ord/document.json",
+  ),
+  undefined,
+);
 assert.equal(matchesVersion("1.1.0", "1.0"), false);
 assert.equal(matchesVersion("2.0.0", "1.9"), false);
 assert.equal(matchesVersion("1.0.0", undefined), false);
@@ -155,6 +238,7 @@ assert.deepEqual(
 );
 
 const groupedCandidates = groupCandidatesByProvider([
+  orderedMatches[0].candidates[0],
   orderedMatches[0].candidates[0],
   {
     provider: orderedMatches[0].candidates[0].provider,

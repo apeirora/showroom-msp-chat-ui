@@ -46,6 +46,7 @@ assert_contains "$public_host_render" 'default_type "application/json;charset=UT
 assert_contains "$public_host_render" 'add_header Cache-Control "public, max-age=300" always;'
 assert_contains "$public_host_render" 'mountPath: /usr/share/nginx/html/ui-extensions/ord/index.html'
 assert_contains "$public_host_render" 'platform-mesh.provider-details.navigate.v1'
+assert_contains "$public_host_render" "img-src 'self' data: https:;"
 
 default_render="$tmpdir/default.yaml"
 helm template chat-ui-ui "$chart_dir" \
