@@ -54,6 +54,7 @@ helm template chat-ui-ui "$chart_dir" \
 assert_contains "$default_render" 'host: "localhost"'
 
 metadata_render="$tmpdir/provider-metadata.yaml"
+metadata_chart_version="$(awk '/^version:/ {print $2; exit}' "$repo_root/charts/chat-ui-pm-integration/Chart.yaml")"
 helm template chat-ui-pm "$repo_root/charts/chat-ui-pm-integration" \
   --set publicHost=chat-ui.example.com \
   --set publicScheme=https \
@@ -61,4 +62,4 @@ helm template chat-ui-pm "$repo_root/charts/chat-ui-pm-integration" \
 assert_contains "$metadata_render" 'displayName: ORD'
 assert_contains "$metadata_render" 'configUrl: "https://chat-ui.example.com/.well-known/open-resource-discovery"'
 assert_contains "$metadata_render" 'detailViewExtensions:'
-assert_contains "$metadata_render" 'url: "https://chat-ui.example.com/ui-extensions/ord/"'
+assert_contains "$metadata_render" "url: \"https://chat-ui.example.com/ui-extensions/ord/?v=$metadata_chart_version\""
