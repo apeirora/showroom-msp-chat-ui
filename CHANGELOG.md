@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0-rc](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.12.6-rc...v0.13.0-rc) (2026-08-24)
+
+
+### Features
+
+* **marketplace:** Refine provider compatibility details ([#119](https://github.com/apeirora/showroom-msp-chat-ui/issues/119)) ([e007934](https://github.com/apeirora/showroom-msp-chat-ui/commit/e0079349622b31c887c2b29711be9130038d7119))
+
 ## [0.12.6-rc](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.12.5-rc...v0.12.6-rc) (2026-08-24)
 
 
