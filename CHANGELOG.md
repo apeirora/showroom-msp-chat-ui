@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.1-rc](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.13.0-rc...v0.13.1-rc) (2026-08-25)
+
+
+### Bug Fixes
+
+* **chart:** add top spacing to ORD details ([#121](https://github.com/apeirora/showroom-msp-chat-ui/issues/121)) ([1fa8bf1](https://github.com/apeirora/showroom-msp-chat-ui/commit/1fa8bf1b4c3a7a1c1b3cacaa9c8555aac79704f5))
+
 ## [0.13.0-rc](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.12.6-rc...v0.13.0-rc) (2026-08-24)
 
 

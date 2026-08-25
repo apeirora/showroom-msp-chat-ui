@@ -3,7 +3,7 @@
   "openResourceDiscovery": "1.16",
   "perspective": "system-version",
   "describedSystemVersion": {
-    "version": "0.13.0-rc"
+    "version": "0.13.1-rc"
   },
   "vendors": [
     {
