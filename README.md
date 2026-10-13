@@ -206,3 +206,11 @@ Use `{{ .ClusterName }}-chat-ui` when another provider owns the source credentia
 The Chat UI agent then owns a separate physical credential replica.
 Keep this value unchanged after instances exist.
 Delete instances and their related replicas before a namespace change.
+
+### Stable releases
+
+Use stable versions for the Showroom demo deployments.
+The release configuration keeps `prerelease: false`.
+When the previous version has an `rc` suffix, use a `Release-As` commit footer to select the next stable version.
+For the namespace configuration release, select `Release-As: 0.14.0`.
+Check the release manifest, chart versions, and controller image tag before merging the release PR.
