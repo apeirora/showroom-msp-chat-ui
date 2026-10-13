@@ -21,5 +21,8 @@ publishedResources:
   enabled: true
   namespace: api-syncagent
   serviceAccountName: chat-ui-sync-agent
+  naming:
+    # Physical customer namespace. Keep this stable after resources exist.
+    namespace: "{{ .ClusterName }}"
   credentialSecrets:
     enabled: true

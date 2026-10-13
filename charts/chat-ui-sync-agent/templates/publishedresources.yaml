@@ -14,7 +14,7 @@ spec:
     apiGroup: ui.privatellms.msp
     version: v1alpha1
   naming:
-    namespace: "{{`{{ .ClusterName }}`}}"
+    namespace: {{ .Values.publishedResources.naming.namespace | quote }}
     name: "{{`{{ .Object.metadata.name }}`}}"
 {{- if .Values.publishedResources.credentialSecrets.enabled }}
   related:

@@ -178,6 +178,9 @@ jobs:
           if [ "$chart" = "chat-ui-ui" ]; then
             bash hack/test-chat-ui-ui-chart.sh "$chart_dir"
           fi
+          if [ "$chart" = "chat-ui-sync-agent" ]; then
+            bash hack/test-chat-ui-sync-agent-chart.sh "$chart_dir"
+          fi
           mkdir -p "$out_dir"
           helm package "$chart_dir" --destination "$out_dir"
           ls -lh "$out_dir"
