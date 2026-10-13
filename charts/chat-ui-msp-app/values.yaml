@@ -39,6 +39,9 @@ chat-ui-sync-agent:
     enabled: true
     namespace: ""   # defaults to release namespace
     serviceAccountName: ""
+    naming:
+      # Physical customer namespace. Keep this stable after resources exist.
+      namespace: "{{ .ClusterName }}"
     credentialSecrets:
       enabled: true
 
