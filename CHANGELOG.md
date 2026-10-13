@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.14.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.13.1-rc...v0.14.0) (2026-10-13)
+
+
+### Features
+
+* **chart:** Configure physical customer namespaces ([#127](https://github.com/apeirora/showroom-msp-chat-ui/issues/127)) ([9845495](https://github.com/apeirora/showroom-msp-chat-ui/commit/9845495dd065dfbb989caad0da43c6cbcc613c34))
+
+
+### Documentation
+
+* Document the stable release transition ([#129](https://github.com/apeirora/showroom-msp-chat-ui/issues/129)) ([575f2c3](https://github.com/apeirora/showroom-msp-chat-ui/commit/575f2c3388eb03846a988f52cd43b017dc43792e))
+
 ## [0.13.1-rc](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.13.0-rc...v0.13.1-rc) (2026-08-25)
 
 
