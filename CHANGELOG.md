@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.1](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.0...v0.14.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* **chart:** Remove the shared API Sync Agent CRD ([#130](https://github.com/apeirora/showroom-msp-chat-ui/issues/130)) ([b573284](https://github.com/apeirora/showroom-msp-chat-ui/commit/b5732848df81de385913691e15f7c8fa2ac115f0))
+
 ## [0.14.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.13.1-rc...v0.14.0) (2026-10-13)
 
 
