@@ -175,6 +175,9 @@ jobs:
           helm dependency update "$chart_dir"
           helm lint "$chart_dir"
           helm template "ci-${chart_name}" "$chart_dir" --namespace default >/dev/null
+          if [ "$chart" = "chat-ui-sync-agent" ]; then
+            bash hack/test-shared-syncagent-crd.sh "$chart_dir"
+          fi
           if [ "$chart" = "chat-ui-ui" ]; then
             bash hack/test-chat-ui-ui-chart.sh "$chart_dir"
           fi
