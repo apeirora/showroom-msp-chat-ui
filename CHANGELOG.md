@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.2](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.1...v0.14.2) (2026-10-14)
+
+
+### Bug Fixes
+
+* **chart:** attach Chat UI to the account ([#132](https://github.com/apeirora/showroom-msp-chat-ui/issues/132)) ([5c78cae](https://github.com/apeirora/showroom-msp-chat-ui/commit/5c78caed6d62734b39b0e055de590e7f11402daa))
+
 ## [0.14.1](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.0...v0.14.1) (2026-10-13)
 
 
