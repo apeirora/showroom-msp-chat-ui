@@ -1,3 +1,7 @@
 
 # packaged subchart tgz
 charts/**/*.tgz
+
+# Provider caller test dependencies and pinned source cache
+tests/node_modules/
+tests/.portal-source/

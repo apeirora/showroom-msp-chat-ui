@@ -17,14 +17,15 @@
                         "collapsible": true,
                         "order": 7
                     },
-                    "entityType": "main.core_platform-mesh_io_account.namespace",
+                    "entityType": "main.core_platform-mesh_io_account",
                     "loadingIndicator": {
                         "enabled": false
                     },
                     "keepSelectedForChildren": true,
                     "url": "/assets/platform-mesh-portal-ui-wc.js#generic-list-view",
                     "webcomponent": {
-                        "selfRegistered": true
+                        "selfRegistered": true,
+                        "type": "module"
                     },
                     "context": {
                         "resourceDefinition": {
@@ -33,7 +34,6 @@
                             "entityCollection": "ChatUIInstances",
                             "entity": "ChatUIInstance",
                             "scope": "Namespaced",
-                            "namespace": null,
                             "ui": {
                                 "logoUrl": "data:image/svg+xml;base64,{{$logo}}",
                                 "listView": {
@@ -41,6 +41,10 @@
                                         {
                                             "label": "Name",
                                             "property": "metadata.name"
+                                        },
+                                        {
+                                            "label": "Namespace",
+                                            "property": "metadata.namespace"
                                         },
                                         {
                                             "label": "Replicas",
@@ -71,7 +75,12 @@
                                             "label": "Replicas",
                                             "property": "spec.replicas",
                                             "required": true,
-                                            "values": ["1", "3", "6", "12"],
+                                            "values": [
+                                                "1",
+                                                "3",
+                                                "6",
+                                                "12"
+                                            ],
                                             "defaultValue": "1"
                                         },
                                         {
@@ -87,6 +96,34 @@
                                             }
                                         }
                                     ]
+                                },
+                                "detailView": {
+                                    "fields": [
+                                        {
+                                            "label": "Name",
+                                            "property": "metadata.name"
+                                        },
+                                        {
+                                            "label": "Namespace",
+                                            "property": "metadata.namespace"
+                                        },
+                                        {
+                                            "label": "Replicas",
+                                            "property": "spec.replicas"
+                                        },
+                                        {
+                                            "label": "Status",
+                                            "property": "status.phase",
+                                            "labelDisplay": true
+                                        },
+                                        {
+                                            "label": "URL",
+                                            "property": "status.url",
+                                            "uiSettings": {
+                                                "displayAs": "link"
+                                            }
+                                        }
+                                    ]
                                 }
                             }
                         }
@@ -96,18 +133,14 @@
                             "pathSegment": ":instanceName",
                             "hideFromNav": true,
                             "keepSelectedForChildren": false,
-                            "defineEntity": {
-                                "id": "ui_privatellms_msp_chatuiinstance",
-                                "contextKey": "instanceName",
-                                "graphqlEntity": {
-                                    "group": "ui.privatellms.msp",
-                                    "version": "v1alpha1",
-                                    "kind": "ChatUIInstance",
-                                    "query": "{ metadata { name annotations } }"
-                                }
-                            },
                             "context": {
-                                "instanceName": ":instanceName"
+                                "instanceName": ":instanceName",
+                                "resourceId": ":instanceName"
+                            },
+                            "url": "/assets/platform-mesh-portal-ui-wc.js#generic-detail-view",
+                            "webcomponent": {
+                                "selfRegistered": true,
+                                "type": "module"
                             }
                         }
                     ]

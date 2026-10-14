@@ -65,3 +65,11 @@ assert_contains "$metadata_render" 'displayName: ORD'
 assert_contains "$metadata_render" 'configUrl: "https://chat-ui.example.com/.well-known/open-resource-discovery"'
 assert_contains "$metadata_render" 'detailViewExtensions:'
 assert_contains "$metadata_render" "url: \"https://chat-ui.example.com/ui-extensions/ord/?v=$metadata_chart_version\""
+
+# Execute the rendered definitions through the pinned portal callers.
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+(
+  cd "$repo_root/tests"
+  npm ci --ignore-scripts
+  npm test
+)
