@@ -199,10 +199,12 @@ Apache License 2.0 -- see [LICENSE](LICENSE) for details.
 ### Physical customer namespace
 
 Set `publishedResources.naming.namespace` in the sync-agent chart to select the physical MSP namespace for each account.
-The default remains `{{ .ClusterName }}`.
+The default uses a readable account and source namespace prefix plus a 20-character SHA3 hash.
+It stays within 63 characters and preserves object names.
 The umbrella path is `chat-ui-sync-agent.publishedResources.naming.namespace`.
 
-Use `{{ .ClusterName }}-chat-ui` when another provider owns the source credential Secret in its own physical namespace.
+Keep the `chat-` provider prefix. Private LLM uses `llm-`, so each provider owns a separate physical credential replica.
+The hash covers the full account/source-namespace tuple, including characters removed by truncation.
 The Chat UI agent then owns a separate physical credential replica.
 Keep this value unchanged after instances exist.
 Delete instances and their related replicas before a namespace change.

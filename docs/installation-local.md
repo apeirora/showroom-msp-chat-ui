@@ -74,14 +74,24 @@ The APIExport resources must include `chatuiinstances`.
 
 ## Create a ChatUIInstance (consumer side)
 
-Chat UI needs a backend endpoint. If you installed Private LLM first, point at its in-cluster service; otherwise provide your own OpenAI-compatible URL and key.
+Chat UI reads the endpoint and API key from a Secret in its KCP namespace.
+Use a Private LLM API token Secret. Do not derive runtime DNS from the KCP namespace.
 
 ```sh
 kubectl kcp workspace use root:orgs:demo   # or create it: see private-llm local install
 
-# If Private LLM is installed, resolve its service DNS:
-LLM_NS=$(kubectl get llminstances -A -o jsonpath='{.items[0].metadata.namespace}')
-LLM_SVC="demo-llm-llama.$LLM_NS.svc.cluster.local"
+# Create the token request in the same KCP namespace as the LLMInstance.
+kubectl apply -f - <<'TOKEN'
+apiVersion: llm.privatellms.msp/v1alpha1
+kind: APITokenRequest
+metadata:
+  name: demo-chat-token
+  namespace: default
+spec:
+  instanceName: demo-llm
+TOKEN
+kubectl wait -n default --for=condition=Ready apitokenrequest/demo-chat-token --timeout=5m
+TOKEN_SECRET=$(kubectl get apitokenrequest demo-chat-token -n default -o jsonpath='{.status.secretName}')
 
 kubectl apply -f - <<EOF
 apiVersion: apis.kcp.io/v1alpha2
@@ -94,18 +104,6 @@ spec:
       path: root:providers:chat-ui
       name: ui.privatellms.msp
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: demo-llm-creds
-  namespace: default
-  labels:
-    apeirora.eu/llm-api-compatibility: "openai"
-type: Opaque
-stringData:
-  OPENAI_API_URL: "http://$LLM_SVC:8000/v1"
-  OPENAI_API_KEY: "not-needed"
----
 apiVersion: ui.privatellms.msp/v1alpha1
 kind: ChatUIInstance
 metadata:
@@ -113,20 +111,22 @@ metadata:
   namespace: default
 spec:
   credentialsSecretRef:
-    name: demo-llm-creds
+    name: "$TOKEN_SECRET"
   replicas: 1
 EOF
 
 kubectl get chatuiinstances -w
 ```
 
-> The `OPENAI_API_URL` uses the in-cluster DNS name. Chat UI calls the LLM server-side, so the URL does not need to be reachable from your browser.
+> The token Secret carries the endpoint published by the LLM operator.
+> The sync agent creates a separate credential replica in the Chat UI runtime namespace.
 
 ## Access the Chat UI
 
 ```sh
-CHAT_NS=$(kubectl get chatuiinstances -A -o jsonpath='{.items[0].metadata.namespace}')
-kubectl port-forward -n "$CHAT_NS" svc/demo-chat-chatui 8080:8080
+# Use the MSP kubeconfig. Find the source namespace stored by api-syncagent.
+CHAT_NS=$(kubectl --context msp get chatuiinstances -A -o json | jq -r '.items[] | select(.metadata.annotations["syncagent.kcp.io/remote-object-namespace"] == "default" and .metadata.annotations["syncagent.kcp.io/remote-object-name"] == "demo-chat") | .metadata.namespace')
+kubectl --context msp port-forward -n "$CHAT_NS" svc/demo-chat-chatui 8080:8080
 ```
 
 Open <http://localhost:8080>.
