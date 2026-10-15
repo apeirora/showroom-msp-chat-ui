@@ -162,7 +162,7 @@ The sync agent bridges KCP org workspaces to the MSP cluster:
 
 1. User creates `ChatUIInstance` in a KCP org workspace
 2. Sync agent detects it via `PublishedResource` configuration
-3. Sync agent creates a mirrored `ChatUIInstance` in the MSP cluster under namespace `{{ .ClusterName }}`
+3. Sync agent creates a mirrored `ChatUIInstance` in the MSP cluster under a bounded namespace derived from the account and the source KCP namespace
 4. The `related` section also syncs the referenced credentials Secret from KCP to the MSP cluster
 5. Chat UI Operator reconciles the local CR
 6. Status updates flow back to KCP via the sync agent
