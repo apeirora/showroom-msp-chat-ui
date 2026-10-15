@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.3](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.2...v0.14.3) (2026-10-15)
+
+
+### Bug Fixes
+
+* **chart:** isolate runtime namespaces and credential replicas ([#135](https://github.com/apeirora/showroom-msp-chat-ui/issues/135)) ([5ebf573](https://github.com/apeirora/showroom-msp-chat-ui/commit/5ebf573a6143f5f94e55b9b007fc1905edcb2c49))
+
 ## [0.14.2](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.1...v0.14.2) (2026-10-14)
 
 
