@@ -67,7 +67,7 @@ kind: ChatUIInstance
 |-------|------|----------|---------|-------------|
 | `spec.credentialsSecretRef.name` | `string` | Yes | -- | Secret in the same namespace with `OPENAI_API_URL` and `OPENAI_API_KEY` |
 | `spec.replicas` | `int32` | No | `1` | Number of Open WebUI pods (minimum 1) |
-| `spec.image` | `string` | No | `ghcr.io/open-webui/open-webui:latest` | Override the Open WebUI container image |
+| `spec.image` | `string` | No | Release-pinned digest | Omit, or use the exact [supported image](user-guide.md#supported-image) |
 
 ### Status Fields
 

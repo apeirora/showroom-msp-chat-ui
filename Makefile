@@ -97,6 +97,7 @@ help: ## Display this help.
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=chat-ui-controller-manager crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	cp config/crd/bases/ui.privatellms.msp_chatuiinstances.yaml charts/chat-ui-operator/crds/
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -112,7 +113,10 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$$($(ENVTEST) use $(ENVTEST_K8S_VERSION) --use-deprecated-gcs=false --bin-dir $(LOCALBIN) -p path)"; \
+	  test -n "$$KUBEBUILDER_ASSETS"; \
+	  export KUBEBUILDER_ASSETS; \
+	  go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
 # Utilize Kind or modify the e2e tests to load the image locally, enabling compatibility with other vendors.
 .PHONY: test-e2e  # Run the e2e tests against a Kind k8s instance that is spun up.
@@ -279,7 +283,7 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 chart: bundle ## Generate bundle manifests and sync CRDs into the Helm chart.
 	mkdir -p charts/chat-ui-operator/crds
 	rm -f charts/chat-ui-operator/crds/ui.privatellms.msp_*
-	cp bundle/manifests/ui.privatellms.msp_* charts/chat-ui-operator/crds/
+	cp config/crd/bases/ui.privatellms.msp_chatuiinstances.yaml charts/chat-ui-operator/crds/
 	# Extract ClusterRole rules from generated RBAC into chart files directory
 	mkdir -p charts/chat-ui-operator/files
 	$(YQ) e '.rules' config/rbac/role.yaml > charts/chat-ui-operator/files/rbac-rules.yaml

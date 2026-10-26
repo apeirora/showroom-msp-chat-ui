@@ -17,23 +17,33 @@ limitations under the License.
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// SupportedImage is the release-pinned Open WebUI image used by managed workloads.
+// This multi-platform index matches the image running on cc-d2 on 2026-10-26.
+const SupportedImage = "ghcr.io/open-webui/open-webui@sha256:096c8f3d3132016210ca87b0b4dff01d2d66d9fe4fee088fae13fc30f9ac54f3"
+
+// CredentialsSecretReference preserves the required, non-empty name in the CRD.
+type CredentialsSecretReference struct {
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+}
 
 // ChatUIInstanceSpec defines the desired state of ChatUIInstance
 type ChatUIInstanceSpec struct {
 	// CredentialsSecretRef references a Secret containing OPENAI_API_URL and OPENAI_API_KEY.
 	// The Secret must be in the same namespace.
-	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
+	CredentialsSecretRef CredentialsSecretReference `json:"credentialsSecretRef"`
 
 	// Replicas configures the number of UI pods. Defaults to 1.
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas,omitempty"`
 
-	// Image optionally overrides the UI container image.
-	// e.g., ghcr.io/open-webui/open-webui:latest
+	// Image may be omitted to use the supported release-pinned image.
+	// An explicit image must exactly match SupportedImage; custom images and tags are rejected.
+	// +kubebuilder:validation:Enum="";"ghcr.io/open-webui/open-webui@sha256:096c8f3d3132016210ca87b0b4dff01d2d66d9fe4fee088fae13fc30f9ac54f3"
 	Image string `json:"image,omitempty"`
 }
 
@@ -53,6 +63,7 @@ type ChatUIInstanceStatus struct {
 }
 
 //+kubebuilder:object:root=true
+//+kubebuilder:resource:shortName=cui
 //+kubebuilder:subresource:status
 //+kubebuilder:printcolumn:name="Secret",type=string,JSONPath=`.spec.credentialsSecretRef.name`
 //+kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`

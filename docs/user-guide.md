@@ -120,16 +120,19 @@ The operator will update the Deployment's environment variables and trigger a ro
 
 If the Secret **contents** change (e.g., rotated API key), the operator detects the checksum change and automatically rolls the pods -- no manual intervention needed.
 
-## Custom Image
+## Supported Image
 
-Override the Open WebUI image:
+Omit `spec.image` to follow the image pinned by the operator release. Custom images,
+mutable tags, whitespace and alternate digests are rejected. An explicit match to
+`api/v1alpha1.SupportedImage` remains accepted for compatibility, but do not set it:
+that explicit pin must be cleared before a later operator image upgrade.
 
-```yaml
-spec:
-  image: ghcr.io/open-webui/open-webui:v0.5.0
-```
-
-If omitted, the default is `ghcr.io/open-webui/open-webui:latest`.
+The API schema rejects unsupported images. The controller also enforces the policy
+for stored objects and installations whose schema has not yet been upgraded.
+A rejected image sets `Ready=False`, reason `ImageNotAllowed`, and `phase=Error`;
+any existing owned Deployment is scaled to zero. Clear `spec.image` to recover.
+Image upgrades interrupt service and discard container-local chat history, uploads,
+settings and sessions. See [the migration procedure](image-policy-upgrades.md).
 
 ## Open WebUI Configuration
 
@@ -156,6 +159,7 @@ Common reasons:
 
 | Reason | Meaning | Fix |
 |--------|---------|-----|
+| `ImageMigration` | Previous image is being scaled down before pinning | Wait for scale-down; check pod termination if stuck |
 | `DeploymentProgressing` | Pods are still rolling out | Wait, or check pod events |
 | `DeploymentNotReady` | Pods are not passing readiness probes | Check pod logs |
 | `ServiceEndpointsMissing` | No ready endpoints on port 8080 | Check pod health |
@@ -170,6 +174,8 @@ kubectl get chatuiinstance my-chat -o jsonpath='{.status.conditions}' | jq
 
 | Reason | Fix |
 |--------|-----|
+| `ImageNotAllowed` | Clear `spec.image` to use the supported release pin |
+| `ImagePolicyError` | Ask the operator to resolve a same-named Deployment owned by another instance |
 | `MissingSecret` | Set `spec.credentialsSecretRef.name` to a valid Secret name |
 | `SecretNotFound` | Create the Secret in the same namespace as the ChatUIInstance |
 

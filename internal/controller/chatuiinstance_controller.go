@@ -21,6 +21,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -111,9 +112,27 @@ func (r *ChatUIInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if !inst.DeletionTimestamp.IsZero() {
 		if ctrlutil.ContainsFinalizer(inst, finalizerName) {
 			ctrlutil.RemoveFinalizer(inst, finalizerName)
-			_ = r.Update(ctx, inst)
+			if err := r.Update(ctx, inst); err != nil {
+				return ctrl.Result{}, err
+			}
 		}
 		return ctrl.Result{}, nil
+	}
+
+	// Enforce the image boundary before reading credentials or creating resources.
+	image, err := resolveImage(inst.Spec.Image)
+	if err != nil {
+		return ctrl.Result{}, r.rejectImage(ctx, inst, err.Error())
+	}
+	if stopping, err := r.stopUnapprovedDeployment(ctx, inst, false); err != nil {
+		if errors.Is(err, errDeploymentNotOwned) {
+			err = errors.Join(err, r.updateImagePolicyStatus(ctx, inst, phaseError, "ImagePolicyError",
+				"The named Deployment is not controlled by this ChatUIInstance"))
+		}
+		return ctrl.Result{}, err
+	} else if stopping {
+		return ctrl.Result{RequeueAfter: provisioningRequeueAfter}, r.updateImagePolicyStatus(ctx, inst,
+			"Provisioning", "ImageMigration", "Waiting for Deployment scale-down before using the supported image")
 	}
 
 	// Ensure finalizer
@@ -133,7 +152,7 @@ func (r *ChatUIInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			Message:            "spec.credentialsSecretRef.name must point to a Secret with OPENAI_API_URL and OPENAI_API_KEY",
 			LastTransitionTime: metav1.NewTime(time.Now()),
 		})
-		inst.Status.Phase = "Error"
+		inst.Status.Phase = phaseError
 		_ = r.Status().Update(ctx, inst)
 		logger.Info("backend secret name is not set")
 		return ctrl.Result{}, nil
@@ -149,7 +168,7 @@ func (r *ChatUIInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				Message:            fmt.Sprintf("Secret %q not found", secretName),
 				LastTransitionTime: metav1.NewTime(time.Now()),
 			})
-			inst.Status.Phase = "Error"
+			inst.Status.Phase = phaseError
 			_ = r.Status().Update(ctx, inst)
 			logger.Info("credentials secret not found", "secret", secretName)
 			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
@@ -171,10 +190,6 @@ func (r *ChatUIInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	replicas := inst.Spec.Replicas
 	if replicas <= 0 {
 		replicas = 1
-	}
-	image := strings.TrimSpace(inst.Spec.Image)
-	if image == "" {
-		image = "ghcr.io/open-webui/open-webui:latest"
 	}
 
 	// Reconcile Deployment

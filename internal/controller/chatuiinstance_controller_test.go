@@ -212,7 +212,7 @@ func TestReconcileDeploymentUpdatesManagedOpenWebUIEnv(t *testing.T) {
 	inst := &uiapiv1alpha1.ChatUIInstance{
 		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: testNamespace, UID: "test-uid"},
 		Spec: uiapiv1alpha1.ChatUIInstanceSpec{
-			CredentialsSecretRef: corev1.LocalObjectReference{Name: "new-token"},
+			CredentialsSecretRef: uiapiv1alpha1.CredentialsSecretReference{Name: "new-token"},
 			Replicas:             1,
 		},
 	}
@@ -244,7 +244,7 @@ func TestReconcileDeploymentUpdatesManagedOpenWebUIEnv(t *testing.T) {
 	}
 	r := newChatUITestReconciler(nil, noopDNSChecker, existing)
 
-	if err := r.reconcileDeployment(context.Background(), inst, uiLabels(inst.Name), 1, "ghcr.io/open-webui/open-webui:latest", "checksum"); err != nil {
+	if err := r.reconcileDeployment(context.Background(), inst, uiLabels(inst.Name), 1, uiapiv1alpha1.SupportedImage, "checksum"); err != nil {
 		t.Fatalf("reconcileDeployment returned error: %v", err)
 	}
 

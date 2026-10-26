@@ -153,6 +153,10 @@ This repository ships four Helm charts:
 |-------|-------------|
 | `ghcr.io/apeirora/chat-ui-controller` | Operator controller binary (distroless) |
 
+The managed Open WebUI workload uses a fixed multi-platform digest. Tenants cannot
+choose arbitrary images. See [supported images](docs/user-guide.md#supported-image)
+and the [image-policy upgrade procedure](docs/image-policy-upgrades.md).
+
 ## Project Structure
 
 ```
