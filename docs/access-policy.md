@@ -74,6 +74,37 @@ New instances remain inaccessible until an operator-reviewed mapping and client
 configuration exist. A source or MSP object recreated under the same name requires
 a new mapping. This version does not automate client registration or mapping.
 
+### Client-secret delivery
+
+Optional `clientSecrets` entries create ExternalSecret v1 resources in
+`accessPolicy.credentialsNamespace`. Leave the list empty when the platform already
+owns delivery. Each referenced **namespaced SecretStore** must exist in that same
+namespace and have verified TLS, scoped source access and a managed credential
+lifecycle. No SecretStore, reader credential or client registration is created here.
+
+```yaml
+clientSecrets:
+  - name: chat-ui-oidc-public # Same as accessPolicy.entries[].clientSecretName.
+    secretStoreName: chat-ui-public-source
+    remoteKey: chat-ui-client-public
+```
+
+For the Kubernetes provider, point the platform-owned store at the correct KCP
+workspace and the source Secret's namespace. Verify the deployed ESO version,
+KCP authentication and authorization-review support before enabling it. The
+ExternalSecret requests only `client_secret`; it never copies
+`registration_access_token` or all Secret data. Refresh is once per minute.
+Source deletion removes the managed destination Secret; an unreachable source
+can leave the last value until it recovers. Revoke the IdP client/KCP audience to
+revoke access immediately rather than relying on secret synchronization alone.
+
+The controller notices delivered-value changes on its periodic reconciliation
+and creates a new immutable bundle with stopped-pod cutover. This resets the
+single-pod development database. Changing a client Secret's name also requires
+changing the reviewed access mapping. Source reference and remote permissions
+remain the platform owner's responsibility. See the
+[ESO Kubernetes provider](https://external-secrets.io/latest/provider/kubernetes/).
+
 ### Coordinated development migration
 
 1. Inventory and stop the old controller as described in [hostname-policy.md](hostname-policy.md).

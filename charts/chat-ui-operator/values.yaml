@@ -22,6 +22,10 @@ accessPolicy:
   credentialsNamespace: ''
   proxyImage: ''
   entries: []
+# Optional ESO delivery from existing scoped, namespaced SecretStores.
+# Each entry: name (matches clientSecretName), secretStoreName, remoteKey.
+# Only client_secret is copied; registration-management credentials stay upstream.
+clientSecrets: []
 env:
   PUBLIC_HOST: chat.localhost
   PUBLIC_SCHEME: https

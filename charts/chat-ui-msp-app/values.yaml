@@ -20,6 +20,7 @@ chat-ui-operator:
   # Required before installation/upgrade; see docs/hostname-policy.md.
   # Required: reviewed source identities and the released access-proxy image digest.
   # No credential values belong here. Client Secrets live in credentialsNamespace.
+  clientSecrets: [] # Optional scoped ESO delivery; see docs/access-policy.md.
   accessPolicy:
     kcpServer: ''
     kcpCA: ''

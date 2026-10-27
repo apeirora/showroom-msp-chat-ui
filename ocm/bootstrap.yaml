@@ -43,6 +43,7 @@ spec:
     targetNamespace: chat-ui
     values:
       # Set before applying; use the reviewed stopped-controller inventory.
+      clientSecrets: [] # Optional existing scoped ESO SecretStore references.
       accessPolicy:
         kcpServer: '${CHAT_UI_KCP_SERVER}'
         credentialsNamespace: chat-ui
