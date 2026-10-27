@@ -22,11 +22,20 @@ The charts are hosted as OCI artifacts on GitHub Container Registry:
 
 ## Install the Operator
 
+Prepare `hostname-policy-values.yaml` with `hostnamePolicy.cutover` and the reviewed
+`hostnamePolicy.entries` described in [hostname migration](hostname-policy.md).
+For a fresh install, use a fixed API-server timestamp before creating instances
+and an empty entries list. Never generate a new cutoff on each upgrade. For an
+existing install, complete the stopped-controller inventory and CRD upgrade first.
+The manager refuses to start with an empty policy. `VERSION` below must be the
+exact reviewed release containing this change; older releases do not enforce it.
+
 ```bash
 helm upgrade --install chat-ui-operator \
   oci://ghcr.io/apeirora/charts/chat-ui-operator \
   --namespace chat-ui --create-namespace \
-  --version 0.8.0 \
+  --version "$VERSION" \
+  -f hostname-policy-values.yaml \
   --set env.PUBLIC_HOST="chat-ui.example.com" \
   --set env.PUBLIC_SCHEME=https \
   --set env.TLS_SECRET_NAME="chat-ui-tls"
@@ -42,6 +51,8 @@ helm upgrade --install chat-ui-operator \
 | `image.imagePullSecrets` | `[]` | Image pull secrets |
 | `manager.replicas` | `1` | Controller replicas |
 | `manager.resources` | `{}` | Resource requests/limits |
+| `hostnamePolicy.cutover` | `""` | Required fixed API-server inventory timestamp; empty refuses startup |
+| `hostnamePolicy.entries` | `[]` | Reviewed UID/namespace/name legacy mappings |
 | `env.PUBLIC_HOST` | `chat.localhost` | Base domain for instance URLs |
 | `env.PUBLIC_SCHEME` | `http` | URL scheme (`http` or `https`) |
 | `env.TLS_SECRET_NAME` | `""` | TLS Secret name for Ingress |
@@ -117,6 +128,8 @@ For a complete Platform Mesh integration, install the charts:
 helm upgrade --install chat-ui-operator \
   oci://ghcr.io/apeirora/charts/chat-ui-operator \
   --namespace chat-ui --create-namespace \
+  --version "$VERSION" \
+  -f hostname-policy-values.yaml \
   --set env.PUBLIC_HOST="chat-ui.example.com" \
   --set env.PUBLIC_SCHEME=https
 

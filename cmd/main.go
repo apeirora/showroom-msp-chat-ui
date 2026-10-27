@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
@@ -46,6 +47,7 @@ import (
 
 	uiapiv1alpha1 "github.com/apeirora/showroom-msp-chat-ui/api/v1alpha1"
 	uictrl "github.com/apeirora/showroom-msp-chat-ui/internal/controller"
+	"github.com/apeirora/showroom-msp-chat-ui/internal/hostnamepolicy"
 )
 
 var (
@@ -141,6 +143,7 @@ func main() {
 	var publicSchemeFlag string
 	var ingressExtraAnnotationsJSON string
 	var tlsSecretName string
+	var hostnamePolicyFile string
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -152,12 +155,19 @@ func main() {
 	flag.StringVar(&ingressExtraAnnotationsJSON, "ingress-extra-annotations", "",
 		"JSON map of extra Ingress annotations to merge")
 	flag.StringVar(&tlsSecretName, "tls-secret-name", "", "Secret name for Ingress TLS (optional)")
+	flag.StringVar(&hostnamePolicyFile, "hostname-policy-file", "",
+		"Required operator-owned hostname migration policy JSON")
 
 	opts := zap.Options{Development: true}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	hostnamePolicy, err := loadHostnamePolicy(hostnamePolicyFile)
+	if err != nil {
+		setupLog.Error(err, "invalid hostname policy; refusing to start")
+		os.Exit(1)
+	}
 
 	if shutdown, err := initOpenTelemetry(context.Background()); err != nil {
 		setupLog.Error(err, "opentelemetry init failed")
@@ -207,8 +217,9 @@ func main() {
 	labeledClient := newLabelingClient(mgr.GetClient(), baseLabels)
 
 	if err = (&uictrl.ChatUIInstanceReconciler{
-		Client: labeledClient,
-		Scheme: mgr.GetScheme(),
+		Client:         labeledClient,
+		Scheme:         mgr.GetScheme(),
+		HostnamePolicy: hostnamePolicy,
 		PublicHost: func() string {
 			if v := os.Getenv("PUBLIC_HOST"); v != "" {
 				return v
@@ -262,6 +273,18 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func loadHostnamePolicy(path string) (*hostnamepolicy.Policy, error) {
+	if path == "" {
+		return nil, fmt.Errorf("--hostname-policy-file is required")
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	return hostnamepolicy.Parse(f)
 }
 
 func initOpenTelemetry(ctx context.Context) (func(context.Context) error, error) {

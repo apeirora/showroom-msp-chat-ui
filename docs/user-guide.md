@@ -94,7 +94,14 @@ The URL follows the pattern:
 
 For example: `https://abc123def456.chat-ui.msp01.dev.showroom.apeirora.eu`
 
-The `<slug>` is a stable 12-character random string assigned on first reconciliation.
+The operator assigns the `<slug>` from immutable instance identity, or preserves
+an explicitly reviewed existing address. Tenant slug annotations are ignored.
+`status.slug` and `status.slugSource` report the selection; they cannot override it.
+An unresolved legacy mapping or conflicting route leaves the instance not ready.
+An already existing route may still serve traffic and needs operator review.
+Consumers must require `Ready=True` for the current generation as well as the slug.
+See [hostname ownership and migration](hostname-policy.md). Access authentication
+is a separate requirement; a unique URL does not restrict who may use the UI.
 
 ## Scaling
 

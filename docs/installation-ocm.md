@@ -62,18 +62,28 @@ kubectl -n chat-ui create secret docker-registry ghcr-credentials \
 
 Create a `values.yaml` override file:
 
+Pin existing installations to their current exact version until the
+[hostname migration](hostname-policy.md) is prepared. The wrapper's `0.14.3`
+default is a hold on the previous release, not a fixed version of this finding.
+After inventory and schema upgrade, select the exact reviewed release containing
+the fix and provide its policy. Fresh installs also need a fixed API-server cutoff
+before creating instances; they may use an empty entries list.
+
 ```yaml
 component:
-  semver: ">=0.8.0"               # semver constraint for the component version
+  semver: "0.14.3" # Hold; replace with the exact reviewed release when migration is ready.
 
 operator:
+  hostnamePolicy:
+    cutover: '' # Required fixed timestamp; an empty value refuses manager startup.
+    entries: [] # Reviewed legacy mappings for an existing installation.
   targetNamespace: chat-ui
   publicHost: chat-ui.example.com
   publicScheme: https
   tlsSecretName: "chat-ui-tls"
   imagePullSecretName: ghcr-credentials
   imageRepository: ghcr.io/apeirora/chat-ui-controller
-  imageTag: "0.8.0"
+  imageTag: "" # Use the selected component's chart default.
   ingressExtraAnnotations: {}
 ```
 
@@ -86,7 +96,7 @@ operator:
 | `component.componentName` | OCM component identity | `ui.privatellms.msp/chat-ui` |
 | `component.repositoryUrl` | OCI registry URL | `ghcr.io/apeirora/ocm` |
 | `component.secretRefName` | Secret with registry credentials | `ghcr-credentials` |
-| `component.semver` | Semver version or constraint | `>=0.8.0` |
+| `component.semver` | Exact reviewed component version | `0.14.3` (migration hold) |
 | `component.interval` | Reconciliation interval | `1m` |
 | `operator.targetNamespace` | Namespace where the operator is deployed | `chat-ui` |
 | `operator.publicHost` | Public hostname for Chat UI | `chat.localhost` |
@@ -96,6 +106,7 @@ operator:
 | `operator.imageRepository` | Operator image repository | `ghcr.io/apeirora/chat-ui-controller` |
 | `operator.imageTag` | Operator image tag | `""` (uses chart default) |
 | `operator.ingressExtraAnnotations` | Extra ingress annotations | `{}` |
+| `operator.hostnamePolicy` | Required fixed cutoff and legacy mappings | Empty cutoff; refuses startup |
 
 ## Step 3: Install via Helm
 
@@ -139,7 +150,7 @@ kubectl get pods -n chat-ui
 Update `component.semver` in your values file and re-apply:
 
 ```sh
-# Edit values.yaml: component.semver: ">=0.9.0"
+# Set component.semver to the exact reviewed version after completing the migration.
 helm template chat-ui charts/chat-ui-operator-ocm/ \
   -f charts/chat-ui-operator-ocm/values.yaml \
   -f ./values.yaml \
@@ -154,12 +165,18 @@ For quick testing without Helm, use `ocm/bootstrap.yaml` with `envsubst`:
 
 ```sh
 export GH_OWNER=apeirora
-export VERSION=">=0.8.0"
+# Set VERSION to the exact reviewed release and HOSTNAME_POLICY_CUTOVER to the fixed inventory timestamp.
+: "${VERSION:?Set an exact reviewed release}"
+: "${HOSTNAME_POLICY_CUTOVER:?Set the reviewed fixed cutoff}"
+export VERSION HOSTNAME_POLICY_CUTOVER
 
 envsubst < ocm/bootstrap.yaml | kubectl apply -f -
 ```
 
-This creates the same three resources (`ComponentVersion`, `Resource`, `FluxDeployer`) with sensible defaults. Edit the `FluxDeployer`'s `.spec.helmReleaseTemplate.values` section in the file to customize operator settings before applying.
+This creates the same three resources (`ComponentVersion`, `Resource`, `FluxDeployer`).
+Before applying, edit the `FluxDeployer`'s `.spec.helmReleaseTemplate.values.hostnamePolicy.entries`
+to include every reviewed legacy mapping, and customize the operator settings.
+An empty entries list is only sufficient for a fresh install with no legacy objects.
 
 ## Component Structure
 
@@ -200,7 +217,8 @@ If you prefer to skip OCM entirely and install the chart directly:
 helm upgrade --install chat-ui-operator \
   oci://ghcr.io/apeirora/charts/chat-ui-operator \
   --namespace chat-ui --create-namespace \
-  --version 0.8.0 \
+  --version "$VERSION" \
+  -f hostname-policy-values.yaml \
   --set env.PUBLIC_HOST="chat-ui.example.com" \
   --set env.PUBLIC_SCHEME=https \
   --set env.TLS_SECRET_NAME="chat-ui-tls"

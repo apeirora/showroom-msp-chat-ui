@@ -9,6 +9,11 @@ manager:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+# Required before deployment. Use a fixed inventory timestamp, never template "now".
+# Entries bind service-cluster UID, namespace and name; see docs/hostname-policy.md.
+hostnamePolicy:
+  cutover: ''
+  entries: []
 env:
   PUBLIC_HOST: chat.localhost
   PUBLIC_SCHEME: http

@@ -17,6 +17,10 @@ imagePullSecret:
 
 # Passed through to the operator sub-chart.
 chat-ui-operator:
+  # Required before installation/upgrade; see docs/hostname-policy.md.
+  hostnamePolicy:
+    cutover: ''
+    entries: []
   env:
     PUBLIC_HOST: localhost
     PUBLIC_SCHEME: http

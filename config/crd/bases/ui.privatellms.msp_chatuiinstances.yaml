@@ -150,6 +150,17 @@ spec:
                 description: Phase is a high-level summary of the instance lifecycle
                   (e.g., "Ready").
                 type: string
+              slug:
+                description: |-
+                  Slug is selected by the operator from immutable identity or reviewed configuration.
+                  It is reported for consumers and is never an input to hostname selection.
+                type: string
+              slugSource:
+                description: SlugSource identifies the operator's selection method.
+                enum:
+                - Derived
+                - Legacy
+                type: string
               url:
                 description: URL is the public URL of the Chat UI.
                 type: string

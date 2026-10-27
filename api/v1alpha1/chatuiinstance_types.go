@@ -55,6 +55,14 @@ type ChatUIInstanceStatus struct {
 	// URL is the public URL of the Chat UI.
 	URL string `json:"url,omitempty"`
 
+	// Slug is selected by the operator from immutable identity or reviewed configuration.
+	// It is reported for consumers and is never an input to hostname selection.
+	Slug string `json:"slug,omitempty"`
+
+	// SlugSource identifies the operator's selection method.
+	// +kubebuilder:validation:Enum=Derived;Legacy
+	SlugSource string `json:"slugSource,omitempty"`
+
 	// ObservedGeneration reflects the generation observed by the controller.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 

@@ -150,6 +150,7 @@ jobs:
       matrix:
         chart:
           - chat-ui-operator
+          - chat-ui-operator-ocm
           - chat-ui-pm-integration
           - chat-ui-sync-agent
           - chat-ui-ui

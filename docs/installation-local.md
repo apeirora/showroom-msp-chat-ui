@@ -41,9 +41,23 @@ helm dependency update charts/chat-ui-pm-app
 
 ### 3. Install the MSP-side umbrella (Kind cluster)
 
+Create `hostname-policy-values.yaml` with the policy nested under the operator:
+
+```yaml
+chat-ui-operator:
+  hostnamePolicy:
+    cutover: '' # Replace with a fixed API-server timestamp before creating instances.
+    entries: []
+```
+
+An empty cutoff refuses manager startup. Reuse the same cutoff on upgrades; if
+instances already exist, follow the [hostname migration](hostname-policy.md)
+to inventory mappings, stop the old controller and apply the CRD first.
+
 ```sh
 helm install chat-ui charts/chat-ui-msp-app \
   --namespace chat-ui --create-namespace \
+  -f hostname-policy-values.yaml \
   --set-file kcpKubeconfig.adminContent=$KCP
 ```
 

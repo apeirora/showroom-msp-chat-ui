@@ -23,8 +23,10 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	uiapi "github.com/apeirora/showroom-msp-chat-ui/api/v1alpha1"
+	"github.com/apeirora/showroom-msp-chat-ui/internal/hostnamepolicy"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -104,8 +106,9 @@ func imagePolicyFixture(t *testing.T, image string, existing bool) (*ChatUIInsta
 	}
 	inst := &uiapi.ChatUIInstance{ObjectMeta: metav1.ObjectMeta{
 		Name: "image-test", Namespace: "tenant", UID: "instance-uid", Generation: 3,
-		Annotations: map[string]string{slugAnnotationKey: "imagetest"},
-		Finalizers:  []string{"ui.privatellms.msp/chatuiinstance-finalizer"},
+		CreationTimestamp: metav1.NewTime(time.Date(2026, 10, 27, 0, 0, 0, 0, time.UTC)),
+		Annotations:       map[string]string{slugAnnotationKey: "imagetest"},
+		Finalizers:        []string{"ui.privatellms.msp/chatuiinstance-finalizer"},
 	}, Spec: uiapi.ChatUIInstanceSpec{Image: image, Replicas: 1, CredentialsSecretRef: uiapi.CredentialsSecretReference{Name: "credentials"}}}
 	secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "credentials", Namespace: inst.Namespace},
 		Data: map[string][]byte{"OPENAI_API_KEY": []byte("synthetic-test-key"), "OPENAI_API_URL": []byte("https://example.test")}}
@@ -118,7 +121,11 @@ func imagePolicyFixture(t *testing.T, image string, existing bool) (*ChatUIInsta
 		objects = append(objects, &deployment)
 	}
 	c := &imagePolicyClient{Client: fake.NewClientBuilder().WithScheme(sch).WithStatusSubresource(inst).WithObjects(objects...).Build()}
-	return &ChatUIInstanceReconciler{Client: c, Scheme: sch, PublicHost: "example.test", PublicScheme: "https"}, inst, c
+	p, err := hostnamepolicy.Parse(strings.NewReader(`{"cutover":"2026-10-26T00:00:00Z"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &ChatUIInstanceReconciler{Client: c, Scheme: sch, HostnamePolicy: p, PublicHost: "example.test", PublicScheme: "https"}, inst, c
 }
 
 func TestImagePolicyRejectsBeforeCredentials(t *testing.T) {

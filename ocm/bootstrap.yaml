@@ -42,6 +42,10 @@ spec:
     releaseName: chat-ui-operator
     targetNamespace: chat-ui
     values:
+      # Set before applying; use the reviewed stopped-controller inventory.
+      hostnamePolicy:
+        cutover: '${HOSTNAME_POLICY_CUTOVER}'
+        entries: [] # Add all reviewed legacy mappings for an existing installation.
       env:
         PUBLIC_HOST: chat-ui.example.com
         PUBLIC_SCHEME: https
