@@ -212,9 +212,17 @@ jobs:
           cache: true
       - name: Pinned OAuth protocol checks
         run: python3 test/access/run_oauth_runtime.py
+      - name: Install isolated browser test dependencies
+        run: |
+          python3 -m venv .runtime-test-venv
+          .runtime-test-venv/bin/pip install playwright==1.64.1
+          .runtime-test-venv/bin/playwright install --with-deps chromium
       - name: Pinned WebUI identity checks
+        env:
+          CHATUI_BROWSER_PYTHON: .runtime-test-venv/bin/python
         run: python3 test/access/run_webui_runtime.py
       - name: Pinned WebUI polling checks
         env:
           ENABLE_WEBSOCKET_SUPPORT: 'false'
+          CHATUI_BROWSER_PYTHON: .runtime-test-venv/bin/python
         run: python3 test/access/run_webui_runtime.py

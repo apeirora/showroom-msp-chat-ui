@@ -91,7 +91,15 @@ func (r *ChatUIInstanceReconciler) hostnameFailure(ctx context.Context, inst *ui
 	case errors.Is(cause, errHostnameConflict):
 		reason, message = "HostnameConflict", "Another Ingress claims the selected hostname; operator review is required"
 	default:
-		return ctrl.Result{}, cause
+		// The caller already withdrew the route. Never retain a Ready URL when
+		// an authoritative read failed; keep internal API errors operator-only.
+		// Preserve the fail-closed schema-migration status set by hostname
+		// selection instead of flipping between two statuses on every reconcile.
+		if inst.Status.URL == "" && !meta.IsStatusConditionTrue(inst.Status.Conditions, "Ready") {
+			return ctrl.Result{}, cause
+		}
+		return ctrl.Result{}, errors.Join(cause, r.updateImagePolicyStatus(ctx, inst, phaseError,
+			"HostnameCheckFailed", "Hostname ownership could not be verified"))
 	}
 	before := inst.DeepCopy()
 	if errors.Is(cause, hostnamepolicy.ErrLegacyUnmapped) || errors.Is(cause, hostnamepolicy.ErrIdentity) {

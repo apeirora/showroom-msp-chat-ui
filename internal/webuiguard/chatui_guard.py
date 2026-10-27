@@ -5,8 +5,8 @@ This wrapper binds *every* native application credential and socket event to
 that authenticated identity. It is deliberately specific to the pinned image.
 """
 import functools
-from http.cookies import SimpleCookie
 from urllib.parse import parse_qs
+from starlette.requests import cookie_parser
 
 from open_webui.main import app as application
 from open_webui.socket import main as sockets
@@ -43,11 +43,18 @@ def guard_event(name, original):
         if name == "connect":
             auth = args[2] if len(args) > 2 else None
             if not isinstance(auth, dict) or not await matches(auth.get("token"), email):
-                return False
+                # The pinned frontend opens its socket before trusted signin.
+                # Permit only an unjoined transport under the outer verified
+                # identity; discard stale/peer credentials rather than passing
+                # them to upstream. No application event can run until a valid
+                # user-join supplies this identity's newly issued native token.
+                return await original(sid, environ, None)
         else:
             # Preserve disconnect cleanup, including pre-authentication failures.
-            if name != "disconnect":
+            if name not in ("disconnect", "user-join"):
                 session = await sockets.sio.get_session(sid)
+                if not session.get("token"):
+                    return False
                 if not await matches(session.get("token"), email):
                     await sockets.sio.disconnect(sid)
                     return False
@@ -56,6 +63,9 @@ def guard_event(name, original):
                     auth = payload["auth"]
                     if not isinstance(auth, dict) or not await matches(auth.get("token"), email):
                         return False
+            if name == "user-join" and (len(args) < 2 or not isinstance(args[1], dict)
+                                         or not await matches((args[1].get("auth") or {}).get("token"), email)):
+                return False
         return await original(*args)
     return guarded
 
@@ -74,8 +84,26 @@ async def deny(scope, send):
         await send({"type": "websocket.close", "code": 1008})
     else:
         await send({"type": "http.response.start", "status": 401,
-                    "headers": [(b"cache-control", b"no-store")]})
-        await send({"type": "http.response.body", "body": b"Sign in required"})
+                    "headers": [(b"cache-control", b"no-store"),
+                                (b"content-type", b"application/json")]})
+        await send({"type": "http.response.body", "body": b'{"detail":"Sign in required"}'})
+
+
+async def stale_credential(scope, send):
+    # A navigation after an organization account switch can carry the previous
+    # native cookie. Clear it before loading frontend assets/config; that app's
+    # signin page then replaces the stale localStorage token. API calls still
+    # fail without exposing another identity's data.
+    navigation = scope["type"] == "http" and scope.get("method") == "GET" and any(
+        k.lower() == b"accept" and b"text/html" in v.lower()
+        for k, v in scope.get("headers", []))
+    if not navigation:
+        return await deny(scope, send)
+    await send({"type": "http.response.start", "status": 303, "headers": [
+        (b"location", b"/auth"), (b"cache-control", b"no-store"),
+        (b"set-cookie", b"token=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax"),
+    ]})
+    await send({"type": "http.response.body", "body": b""})
 
 
 async def app(scope, receive, send):
@@ -84,6 +112,10 @@ async def app(scope, receive, send):
     # The health port reaches only this fixed probe, never arbitrary paths.
     if scope.get("path") == "/health" and scope.get("method") == "GET":
         return await application(scope, receive, send)
+    if scope["type"] == "websocket" and scope.get("path", "").rstrip("/") != "/ws/socket.io":
+        # Other native WebSocket handlers authenticate a first-message JWT and
+        # have no trusted-header binding. They are outside this chat profile.
+        return await deny(scope, send)
     try:
         email = identity(scope.get("headers", []))
         if not email:
@@ -98,24 +130,29 @@ async def app(scope, receive, send):
                 return await deny(scope, send)
         # Trusted signin replaces stale localStorage/cookies after an account
         # switch. Remove them there, and validate both forms on all other paths.
-        signin = scope.get("path", "").rstrip("/") in ("/api/v1/auths/signin", "", "/auth")
+        signin = scope.get("path", "").rstrip("/") == "/api/v1/auths/signin"
+        # The socket connect callback asks for public version metadata before
+        # native signin, sometimes with a stale token or literal "undefined".
+        # This exact pinned endpoint has no user dependency or user data.
+        public_version = scope.get("path") == "/api/version" and scope.get("method") == "GET"
         headers = []
         for key, value in scope.get("headers", []):
             if key.lower() == b"authorization":
-                if signin:
+                if signin or public_version:
                     continue
                 kind, _, token = value.decode("ascii").partition(" ")
                 if kind.lower() != "bearer" or not await matches(token, email):
-                    return await deny(scope, send)
+                    return await stale_credential(scope, send)
             if key.lower() == b"cookie":
-                cookies = SimpleCookie()
-                cookies.load(value.decode("ascii"))
+                # Match the application's parser exactly. SimpleCookie silently
+                # discards malformed pairs that Starlette still accepts, allowing
+                # a later token cookie to escape identity validation.
+                cookies = cookie_parser(value.decode("ascii"))
                 if "token" in cookies:
-                    if signin:
-                        del cookies["token"]
-                        value = "; ".join(m.OutputString() for m in cookies.values()).encode("ascii")
-                    elif not await matches(cookies["token"].value, email):
-                        return await deny(scope, send)
+                    if signin or public_version:
+                        continue
+                    elif not await matches(cookies["token"], email):
+                        return await stale_credential(scope, send)
             headers.append((key, value))
         scope = {**scope, "headers": headers}
     except Exception:

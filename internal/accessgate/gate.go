@@ -245,6 +245,12 @@ func (g *Gate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Trusted-header signin is the only credential-creation path. Deny local
 	// password, API-key, LDAP, administrator and OAuth-token exchange endpoints.
 	p := path.Clean(r.URL.Path)
+	// Only Socket.IO has message-token identity binding in the pinned guard.
+	// Terminal and realtime-audio WebSockets use independent first-message JWTs.
+	if upgrade && p != "/ws/socket.io" {
+		http.Error(w, "WebSocket route unavailable", http.StatusForbidden)
+		return
+	}
 	if strings.HasPrefix(p, "/api/v1/auths/") && !allowedAuthPath(p) {
 		http.Error(w, "Authentication managed by the platform", http.StatusForbidden)
 		return

@@ -284,8 +284,10 @@ func TestImagePolicyTransientErrorStaysOutOfStatus(t *testing.T) {
 	if err := c.Get(ctx, client.ObjectKeyFromObject(inst), inst); err != nil {
 		t.Fatal(err)
 	}
-	if condition := meta.FindStatusCondition(inst.Status.Conditions, "Ready"); condition != nil || inst.Status.Phase == phaseError || c.secretReads != 0 {
-		t.Fatal("published an internal API failure as an image policy error")
+	if condition := meta.FindStatusCondition(inst.Status.Conditions, "Ready"); condition == nil ||
+		condition.Reason != "ImageCheckFailed" || condition.Status != metav1.ConditionFalse ||
+		condition.Message != "The Deployment image could not be verified" || inst.Status.URL != "" || c.secretReads != 0 {
+		t.Fatal("API failure left stale status or exposed internal error details")
 	}
 }
 

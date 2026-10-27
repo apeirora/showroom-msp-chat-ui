@@ -134,11 +134,12 @@ func (r *ChatUIInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, r.rejectImage(ctx, inst, err.Error())
 	}
 	if stopping, err := r.stopUnapprovedDeployment(ctx, inst, false); err != nil {
+		reason, message := "ImageCheckFailed", "The Deployment image could not be verified"
 		if errors.Is(err, errDeploymentNotOwned) {
-			err = errors.Join(err, r.updateImagePolicyStatus(ctx, inst, phaseError, "ImagePolicyError",
-				"The named Deployment is not controlled by this ChatUIInstance"))
+			reason, message = "ImagePolicyError", "The named Deployment is not controlled by this ChatUIInstance"
 		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, errors.Join(err, r.withdrawAccess(ctx, inst),
+			r.updateImagePolicyStatus(ctx, inst, phaseError, reason, message))
 	} else if stopping {
 		return ctrl.Result{RequeueAfter: provisioningRequeueAfter}, errors.Join(r.withdrawAccess(ctx, inst), r.updateImagePolicyStatus(ctx, inst,
 			phaseProvisioning, "ImageMigration", "Waiting for Deployment scale-down before using the supported image"))
@@ -169,33 +170,14 @@ func (r *ChatUIInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// Validate secret reference
 	secretName := strings.TrimSpace(inst.Spec.CredentialsSecretRef.Name)
 	if secretName == "" {
-		meta.SetStatusCondition(&inst.Status.Conditions, metav1.Condition{
-			Type: "Ready", Status: metav1.ConditionFalse, Reason: "MissingSecret",
-			Message:            "spec.credentialsSecretRef.name must point to a Secret with OPENAI_API_URL and OPENAI_API_KEY",
-			LastTransitionTime: metav1.NewTime(time.Now()),
-		})
-		inst.Status.Phase = phaseError
-		_ = r.Status().Update(ctx, inst)
-		logger.Info("backend secret name is not set")
-		return ctrl.Result{}, nil
+		return r.denyAccess(ctx, inst, errors.New("backend secret name is not set"))
 	}
 
 	// Fetch the credentials secret and compute checksum for rollout detection
 	var credentialsSecret corev1.Secret
 	secretKey := client.ObjectKey{Namespace: inst.Namespace, Name: secretName}
 	if err := r.Get(ctx, secretKey, &credentialsSecret); err != nil {
-		if apierrors.IsNotFound(err) {
-			meta.SetStatusCondition(&inst.Status.Conditions, metav1.Condition{
-				Type: "Ready", Status: metav1.ConditionFalse, Reason: "SecretNotFound",
-				Message:            fmt.Sprintf("Secret %q not found", secretName),
-				LastTransitionTime: metav1.NewTime(time.Now()),
-			})
-			inst.Status.Phase = phaseError
-			_ = r.Status().Update(ctx, inst)
-			logger.Info("credentials secret not found", "secret", secretName)
-			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
-		}
-		return ctrl.Result{}, err
+		return r.denyAccess(ctx, inst, fmt.Errorf("backend credentials unavailable: %w", err))
 	}
 	secretChecksum := computeSecretChecksum(&credentialsSecret)
 
@@ -382,6 +364,9 @@ func buildDeployment(inst *uiapiv1alpha1.ChatUIInstance, labels map[string]strin
 		{Name: "ENABLE_OPENAI_API", Value: trueValue},
 		{Name: "ENABLE_OLLAMA_API", Value: "false"},
 		{Name: "ENABLE_DIRECT_CONNECTIONS", Value: "false"},
+		// Every permitted instance user may use its operator-configured backend.
+		// Workspace model editing remains disabled and no app user is an admin.
+		{Name: "BYPASS_MODEL_ACCESS_CONTROL", Value: "true"},
 
 		// Access & admin experience
 		{Name: "ENABLE_LOGIN_FORM", Value: "false"},

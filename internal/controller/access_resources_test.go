@@ -14,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -88,6 +89,71 @@ func TestMissingAccessWithdrawsOwnedRouteAndStopsWorkload(t *testing.T) {
 	var deployment appsv1.Deployment
 	if err := r.Get(context.Background(), client.ObjectKey{Namespace: inst.Namespace, Name: inst.Name + "-chatui"}, &deployment); err != nil || *deployment.Spec.Replicas != 0 {
 		t.Fatalf("old workload not stopped: %v", err)
+	}
+}
+
+func TestMigrationFailureWithdrawsPreviousRoute(t *testing.T) {
+	const foreignDeployment = "foreign-deployment"
+	for _, failure := range []string{"missing-reference", "missing-secret", foreignDeployment, "route-read-error"} {
+		t.Run(failure, func(t *testing.T) {
+			ctx := context.Background()
+			inst := hostnameInstance("ui", "tenant", "uid")
+			credentials := hostnameCredentials(inst.Namespace)
+			r := hostnameReconciler(t, inst, credentials)
+			reconcileHostname(t, r, inst)
+			inst.Status.URL = "https://previous.example.test"
+			meta.SetStatusCondition(&inst.Status.Conditions, metav1.Condition{Type: "Ready", Status: metav1.ConditionTrue, Reason: "Ready", Message: "Previous controller"})
+			if err := r.Status().Update(ctx, inst); err != nil {
+				t.Fatal(err)
+			}
+			key := client.ObjectKey{Namespace: inst.Namespace, Name: inst.Name + "-chatui"}
+			var deployment appsv1.Deployment
+			if err := r.Get(ctx, key, &deployment); err != nil {
+				t.Fatal(err)
+			}
+			// Same approved image can still be the prior unauthenticated template.
+			deployment.Spec.Template.Spec.Containers = deployment.Spec.Template.Spec.Containers[:1]
+			deployment.Spec.Template.Spec.Containers[0].Env = nil
+			if failure == foreignDeployment {
+				deployment.OwnerReferences = nil
+			}
+			if err := r.Update(ctx, &deployment); err != nil {
+				t.Fatal(err)
+			}
+			switch failure {
+			case "missing-reference":
+				inst.Spec.CredentialsSecretRef.Name = ""
+				if err := r.Update(ctx, inst); err != nil {
+					t.Fatal(err)
+				}
+			case "missing-secret":
+				if err := r.Delete(ctx, credentials); err != nil {
+					t.Fatal(err)
+				}
+			case "route-read-error":
+				r.RouteReader = failingRouteReader{Reader: r.Client}
+			}
+			_, _ = r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(inst)})
+			var ing networkingv1.Ingress
+			if err := r.Get(ctx, key, &ing); !apierrors.IsNotFound(err) {
+				t.Fatalf("old route retained: %v", err)
+			}
+			if err := r.Get(ctx, key, &deployment); err != nil {
+				t.Fatal(err)
+			}
+			if failure != foreignDeployment && *deployment.Spec.Replicas != 0 {
+				t.Fatal("old workload left running")
+			}
+			if failure == foreignDeployment && *deployment.Spec.Replicas != 1 {
+				t.Fatal("foreign workload changed")
+			}
+			if err := r.Get(ctx, client.ObjectKeyFromObject(inst), inst); err != nil {
+				t.Fatal(err)
+			}
+			if inst.Status.URL != "" || meta.IsStatusConditionTrue(inst.Status.Conditions, "Ready") {
+				t.Fatal("stale ready URL retained")
+			}
+		})
 	}
 }
 

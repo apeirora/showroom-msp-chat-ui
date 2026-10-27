@@ -12,6 +12,10 @@ access proxy on **127.0.0.1:8082**, and the pinned Open WebUI on
 **127.0.0.1:8081**. Service and Ingress expose only 8080. Port 8083 serves only a
 fixed readiness probe. The mounted Python wrapper binds native WebUI tokens and
 Socket.IO sessions to the identity supplied by the access proxy.
+Only the guarded Socket.IO WebSocket path is enabled; terminal and realtime-audio
+WebSocket routes are refused before upgrade. During frontend bootstrap a socket
+may connect without an application session, but cannot join rooms or run application
+events until `user-join` supplies a token belonging to the verified identity.
 
 ## WHY
 
@@ -29,6 +33,15 @@ application access. The native WebUI Authorization header is preserved but its
 credential must belong to the signed-in identity. Local signup, LDAP, password,
 API-key and administrator credential endpoints are blocked. The original pinned
 WebUI image is unchanged; the mounted guard is versioned with the access bundle.
+The guard uses the same cookie parser as WebUI. Browser navigation with an old
+account cookie clears it and returns to trusted signin; API requests with that
+cookie still fail. Trusted signin and the exact GET `/api/version` bootstrap
+endpoint discard native credentials; version returns only public deployment metadata.
+
+All authorized users may use the backend models configured for this instance.
+`BYPASS_MODEL_ACCESS_CONTROL=true` avoids a second, unpopulated WebUI model-grant
+database blocking ordinary users. Workspace model editing and direct connections
+remain disabled; this does not bypass chat ownership or grant administrator access.
 
 ## ACTION
 
@@ -118,6 +131,8 @@ remain the platform owner's responsibility. See the
    the prior Deployment and waits for observed zero replicas **and no matching
    pods** before installing the guarded template. Foreign objects are never adopted.
    Missing/invalid access mappings also withdraw owned routes and stop owned workloads.
+   Missing backend credentials and ownership/read failures also withdraw owned
+   routes; an unrelated Deployment is never modified. Withdrawn routes lose Ready URLs.
 4. Test two ordinary identities and an authorized administrator, denied peer-account
    access, permission revocation, source recreation, first login, account switching,
    refresh, logout, WebSockets, HTTP streaming and actual DNS/TLS/Ingress behavior.
@@ -170,6 +185,12 @@ configuration; never present a rollback as continued authenticated protection.
   container with no host ports or external network; it checks first-user role,
   HTTP/session isolation, forbidden credential routes and socket identity binding.
   Repeat with `ENABLE_WEBSOCKET_SUPPORT=false` for the upstream polling mode.
+- Set `CHATUI_BROWSER_PYTHON` to a Python environment with Playwright 1.64.1 and
+  Chromium installed to also run the real frontend. This opt-in fixture publishes
+  only a random loopback HTTPS port and uses a disposable model stub. It exercises
+  first login, socket bootstrap, shared-browser account switching, streamed chat
+  rendering and private chat isolation. It simulates the already-verified outer
+  identity, so it is not a real organization login/KCP/Ingress acceptance test.
 
 These fixtures use no live users or model backend and are not a vulnerability audit
 of either upstream image. Review the pinned compatibility guard whenever either

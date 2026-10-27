@@ -308,6 +308,21 @@ func TestGateClosesUpgradedConnectionAtTokenExpiry(t *testing.T) {
 	}
 }
 
+func TestGateRejectsUnboundWebSocketRoutes(t *testing.T) {
+	f := newFixture(t)
+	for _, p := range []string{"/api/v1/audio/realtime", "/api/v1/terminals/server/api/terminals/session", "/ws/other"} {
+		r := f.request(http.MethodGet)
+		r.URL.Path = p
+		r.Header.Set("Upgrade", "websocket")
+		r.Header.Set("Connection", "Upgrade")
+		w := httptest.NewRecorder()
+		f.gate.ServeHTTP(w, r)
+		if w.Code != http.StatusForbidden || f.calls.Load() != 0 {
+			t.Fatalf("unbound WebSocket route reached application: %s (%d)", p, w.Code)
+		}
+	}
+}
+
 func TestGateClosesActiveSocketAfterPermissionRevocation(t *testing.T) {
 	f := newFixture(t)
 	f.token = fixtureToken("alice", time.Now().Add(time.Hour))
