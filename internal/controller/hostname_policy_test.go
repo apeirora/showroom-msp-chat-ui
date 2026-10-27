@@ -106,7 +106,7 @@ func TestHostnameLegacyMappingAndUnmappedDeletion(t *testing.T) {
 			counter := &imagePolicyClient{Client: r.Client}
 			r.Client = counter
 			reconcileHostname(t, r, inst)
-			if !reflect.DeepEqual(ing.Spec, getHostnameIngress(t, r, inst).Spec) {
+			if mapped && !reflect.DeepEqual(ing.Spec, getHostnameIngress(t, r, inst).Spec) {
 				t.Fatal("legacy route changed")
 			}
 			if mapped {
@@ -114,6 +114,10 @@ func TestHostnameLegacyMappingAndUnmappedDeletion(t *testing.T) {
 					t.Fatal("legacy ownership mapping not used")
 				}
 			} else {
+				var withdrawn networkingv1.Ingress
+				if err := r.Get(context.Background(), client.ObjectKeyFromObject(ing), &withdrawn); !apierrors.IsNotFound(err) {
+					t.Fatalf("unmapped route not withdrawn: %v", err)
+				}
 				condition := meta.FindStatusCondition(inst.Status.Conditions, "Ready")
 				if counter.secretReads != 0 || condition == nil || condition.Reason != "LegacyHostnameUnmapped" || inst.Status.URL != "" {
 					t.Fatal("unmapped legacy object did not stop before credential access")

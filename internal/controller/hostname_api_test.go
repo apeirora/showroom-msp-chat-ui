@@ -89,6 +89,7 @@ func TestHostnamePolicyWithAPIServer(t *testing.T) {
 		if inst.UID == "" || inst.CreationTimestamp.IsZero() {
 			t.Fatal("API server did not assign identity")
 		}
+		configureTestAccess(t, r, inst)
 		if err := c.Create(ctx, hostnameCredentials(namespace)); err != nil {
 			t.Fatal(err)
 		}

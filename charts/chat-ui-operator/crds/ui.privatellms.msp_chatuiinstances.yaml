@@ -83,6 +83,13 @@ spec:
           status:
             description: ChatUIInstanceStatus defines the observed state of ChatUIInstance
             properties:
+              accessSecretUIDs:
+                additionalProperties:
+                  type: string
+                description: |-
+                  AccessSecretUIDs pins server-assigned identities of controller-created keys
+                  and the current immutable access bundle. Recreated Secrets are not adopted.
+                type: object
               conditions:
                 description: Conditions represent the latest available observations
                   of the resource's state.

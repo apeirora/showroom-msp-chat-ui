@@ -19,6 +19,7 @@ spec:
   template:
     metadata:
       annotations:
+        checksum/access-policy: {{ include (print $.Template.BasePath "/access-policy.yaml") . | sha256sum }}
         checksum/hostname-policy: {{ include (print $.Template.BasePath "/hostname-policy.yaml") . | sha256sum }}
       labels:
         control-plane: controller-manager
@@ -34,8 +35,12 @@ spec:
           args:
             - "--metrics-bind-address=:8080"
             - "--health-probe-bind-address=:8081"
+            - "--access-policy-file=/etc/chat-ui-access/policy.json"
             - "--hostname-policy-file=/etc/chat-ui-hostnames/policy.json"
           volumeMounts:
+            - name: access-policy
+              mountPath: /etc/chat-ui-access
+              readOnly: true
             - name: hostname-policy
               mountPath: /etc/chat-ui-hostnames
               readOnly: true
@@ -68,6 +73,9 @@ spec:
           resources:
             {{- toYaml .Values.manager.resources | nindent 12 }}
       volumes:
+        - name: access-policy
+          configMap:
+            name: {{ include "chatui.fullname" . }}-access-policy
         - name: hostname-policy
           configMap:
             name: {{ include "chatui.fullname" . }}-hostname-policy

@@ -48,8 +48,8 @@ with `Ready=False` and no published URL. They are not silently renamed. This hol
 even if their tenant annotation or previous status names a valid address. The
 ordinary Chat UI deletion path remains available without a mapping.
 
-This controller denial does **not** withdraw an already existing Ingress or stop
-access to it. The migration inventory must resolve every existing route before
+With the instance access gate, this denial withdraws an owned Ingress and stops
+the owned workload. Foreign routes require operator recovery. The migration inventory must resolve every existing route before
 rollout; an unowned or ambiguous route requires a separately authorized repair.
 The independent image policy can still stop an unsupported Deployment before
 hostname validation. Do not describe unresolved legacy routing as secured.
@@ -67,8 +67,7 @@ pass repeats HTTP/DNS checks and two cluster-wide Ingress lists; budget for this
 load and for transient health failures moving an instance back to Provisioning.
 
 The owned Ingress's rules converge to one host/path/backend reference; stale rules
-and default backends are removed. This does not verify ownership of an already
-existing backend Service. Additional TLS entries and unmanaged annotations are
+and default backends are removed. The access integration also verifies ownership and converges the backend Service. Additional TLS entries and unmanaged annotations are
 preserved by the existing reconciler and require inventory. The API's
 resource-version checks protect updates against concurrent edits to that object.
 
@@ -105,7 +104,7 @@ part of the platform trust boundary. Inventory DNS and all routing kinds separat
    schema can prune them. The manager verifies persistence using an uncached read
    after a hostname status change; pruning stops reconciliation before credentials
    or routes, leaves a stable non-ready status, and returns a retryable log error.
-   It does not withdraw existing routes. Helm's CRD directory alone does not upgrade existing CRDs.
+   The access integration withdraws owned routes and stops owned workloads on this failure. Helm's CRD directory alone does not upgrade existing CRDs.
    Coordinate this with the separate image-policy migration in
    [image-policy-upgrades.md](image-policy-upgrades.md); all prior gates still apply.
    Finish the required image-value cleanup before applying the combined schema.

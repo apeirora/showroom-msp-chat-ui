@@ -13,6 +13,8 @@ spec:
     releaseName: {{ .Values.component.name }}
     targetNamespace: {{ .Values.operator.targetNamespace }}
     values:
+      accessPolicy:
+        {{- toYaml .Values.operator.accessPolicy | nindent 8 }}
       hostnamePolicy:
         {{- toYaml .Values.operator.hostnamePolicy | nindent 8 }}
       env:

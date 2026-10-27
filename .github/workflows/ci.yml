@@ -11,6 +11,9 @@ on:
       - go.mod
       - go.sum
       - '**/*.go'
+      - 'internal/**/*.py'
+      - 'test/access/**'
+      - 'Dockerfile'
       - 'charts/**'
       - '.github/workflows/ci.yml'
       - 'hack/validate-ord.mjs'
@@ -195,3 +198,23 @@ jobs:
           echo "chart_dir=${out_dir}" >> "$GITHUB_OUTPUT"
           echo "chart_name=${chart_name}" >> "$GITHUB_OUTPUT"
           echo "::endgroup::"
+
+  access-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Pinned OAuth protocol checks
+        run: python3 test/access/run_oauth_runtime.py
+      - name: Pinned WebUI identity checks
+        run: python3 test/access/run_webui_runtime.py
+      - name: Pinned WebUI polling checks
+        env:
+          ENABLE_WEBSOCKET_SUPPORT: 'false'
+        run: python3 test/access/run_webui_runtime.py

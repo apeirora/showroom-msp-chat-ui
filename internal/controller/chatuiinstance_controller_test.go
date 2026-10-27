@@ -243,8 +243,18 @@ func TestReconcileDeploymentUpdatesManagedOpenWebUIEnv(t *testing.T) {
 		},
 	}
 	r := newChatUITestReconciler(nil, noopDNSChecker, existing)
+	configureTestAccess(t, r, inst)
+	existing.OwnerReferences = []metav1.OwnerReference{{APIVersion: uiapiv1alpha1.GroupVersion.String(), Kind: "ChatUIInstance", Name: inst.Name, UID: inst.UID, Controller: ptrTo(true)}}
+	existing.Spec.Selector = &metav1.LabelSelector{MatchLabels: uiLabels(inst.Name)}
+	if err := r.Update(context.Background(), existing); err != nil {
+		t.Fatal(err)
+	}
+	access := &accessBundle{name: "bundle", sessionName: sessionSecretName(inst), revision: "test", publicURL: "https://ui.example.test"}
 
-	if err := r.reconcileDeployment(context.Background(), inst, uiLabels(inst.Name), 1, uiapiv1alpha1.SupportedImage, "checksum"); err != nil {
+	if err := r.reconcileDeployment(context.Background(), inst, uiLabels(inst.Name), 1, uiapiv1alpha1.SupportedImage, "checksum", access); !errors.Is(err, errAccessCutover) {
+		t.Fatalf("old workload did not stop before migration: %v", err)
+	}
+	if err := r.reconcileDeployment(context.Background(), inst, uiLabels(inst.Name), 1, uiapiv1alpha1.SupportedImage, "checksum", access); err != nil {
 		t.Fatalf("reconcileDeployment returned error: %v", err)
 	}
 
@@ -253,8 +263,8 @@ func TestReconcileDeploymentUpdatesManagedOpenWebUIEnv(t *testing.T) {
 		t.Fatalf("failed to get updated deployment: %v", err)
 	}
 	env := updated.Spec.Template.Spec.Containers[0].Env
-	if got := envValue(env, "WEBUI_AUTH"); got != "false" {
-		t.Fatalf("expected WEBUI_AUTH=false, got %q", got)
+	if got := envValue(env, "WEBUI_AUTH"); got != "true" {
+		t.Fatalf("expected WEBUI_AUTH=true, got %q", got)
 	}
 	if got := envValue(env, "WEBUI_ADMIN_EMAIL"); got != "" {
 		t.Fatalf("expected stale WEBUI_ADMIN_EMAIL to be removed, got %q", got)

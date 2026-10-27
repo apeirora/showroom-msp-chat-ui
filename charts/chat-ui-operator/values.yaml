@@ -14,9 +14,17 @@ manager:
 hostnamePolicy:
   cutover: ''
   entries: []
+# Required: reviewed source identities and the released access-proxy image digest.
+# No credential values belong here. Client Secrets live in credentialsNamespace.
+accessPolicy:
+  kcpServer: ''
+  kcpCA: ''
+  credentialsNamespace: ''
+  proxyImage: ''
+  entries: []
 env:
   PUBLIC_HOST: chat.localhost
-  PUBLIC_SCHEME: http
+  PUBLIC_SCHEME: https
   INGRESS_EXTRA_ANNOTATIONS: '{}'
   TLS_SECRET_NAME: ''
 rbac:

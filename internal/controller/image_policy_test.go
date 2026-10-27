@@ -120,12 +120,14 @@ func imagePolicyFixture(t *testing.T, image string, existing bool) (*ChatUIInsta
 		}
 		objects = append(objects, &deployment)
 	}
-	c := &imagePolicyClient{Client: fake.NewClientBuilder().WithScheme(sch).WithStatusSubresource(inst).WithObjects(objects...).Build()}
+	c := &imagePolicyClient{Client: fake.NewClientBuilder().WithScheme(sch).WithStatusSubresource(inst).WithObjects(objects...).WithInterceptorFuncs(fakeServerUIDs()).Build()}
 	p, err := hostnamepolicy.Parse(strings.NewReader(`{"cutover":"2026-10-26T00:00:00Z"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &ChatUIInstanceReconciler{Client: c, Scheme: sch, HostnamePolicy: p, PublicHost: "example.test", PublicScheme: "https"}, inst, c
+	r := &ChatUIInstanceReconciler{Client: c, Scheme: sch, HostnamePolicy: p, PublicHost: "example.test", PublicScheme: "https"}
+	configureTestAccess(t, r, inst)
+	return r, inst, c
 }
 
 func TestImagePolicyRejectsBeforeCredentials(t *testing.T) {

@@ -40,13 +40,15 @@ func resolveImage(requested string) (string, error) {
 }
 
 func (r *ChatUIInstanceReconciler) rejectImage(ctx context.Context, inst *uiapi.ChatUIInstance, message string) error {
+	withdrawErr := r.withdrawAccess(ctx, inst)
 	_, stopErr := r.stopUnapprovedDeployment(ctx, inst, true)
 	statusErr := r.updateImagePolicyStatus(ctx, inst, phaseError, "ImageNotAllowed", message)
-	return errors.Join(stopErr, statusErr)
+	return errors.Join(withdrawErr, stopErr, statusErr)
 }
 
 func (r *ChatUIInstanceReconciler) updateImagePolicyStatus(ctx context.Context, inst *uiapi.ChatUIInstance, phase, reason, message string) error {
 	before := inst.DeepCopy()
+	inst.Status.URL = ""
 	inst.Status.Phase = phase
 	inst.Status.ObservedGeneration = inst.Generation
 	meta.SetStatusCondition(&inst.Status.Conditions, metav1.Condition{
@@ -61,10 +63,10 @@ func (r *ChatUIInstanceReconciler) stopUnapprovedDeployment(ctx context.Context,
 	// workload too: merely rejecting future updates would leave its image running.
 	var deployment appsv1.Deployment
 	key := client.ObjectKey{Namespace: inst.Namespace, Name: inst.Name + "-chatui"}
-	if err := r.Get(ctx, key, &deployment); err != nil {
+	if err := r.routeReader().Get(ctx, key, &deployment); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
-	if !metav1.IsControlledBy(&deployment, inst) {
+	if !ownedByInstance(&deployment, inst) {
 		return false, fmt.Errorf("%w: %s", errDeploymentNotOwned, key)
 	}
 	unapproved := force

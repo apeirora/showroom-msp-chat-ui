@@ -49,6 +49,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	uiapiv1alpha1 "github.com/apeirora/showroom-msp-chat-ui/api/v1alpha1"
+	"github.com/apeirora/showroom-msp-chat-ui/internal/accesspolicy"
 	"github.com/apeirora/showroom-msp-chat-ui/internal/hostnamepolicy"
 )
 
@@ -58,6 +59,7 @@ type ChatUIInstanceReconciler struct {
 	Scheme *runtime.Scheme
 	// HostnamePolicy is immutable operator configuration, never tenant metadata.
 	HostnamePolicy *hostnamepolicy.Policy
+	AccessPolicy   *accesspolicy.Policy
 	// RouteReader bypasses the cache for cross-namespace hostname/owner checks.
 	RouteReader client.Reader
 
@@ -77,6 +79,8 @@ type ChatUIInstanceReconciler struct {
 	DNSChecker DNSChecker
 }
 
+const trueValue = "true"
+
 const (
 	slugAnnotationKey        = "ui.privatellms.msp/slug"
 	secretChecksumAnnotation = "ui.privatellms.msp/secret-checksum"
@@ -92,8 +96,9 @@ type DNSChecker func(ctx context.Context, host string) error
 //+kubebuilder:rbac:groups=ui.privatellms.msp,resources=chatuiinstances/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=ui.privatellms.msp,resources=chatuiinstances/finalizers,verbs=update
 // core + apps
-//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create
 //+kubebuilder:rbac:groups="",resources=endpoints,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
@@ -135,21 +140,21 @@ func (r *ChatUIInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 		return ctrl.Result{}, err
 	} else if stopping {
-		return ctrl.Result{RequeueAfter: provisioningRequeueAfter}, r.updateImagePolicyStatus(ctx, inst,
-			phaseProvisioning, "ImageMigration", "Waiting for Deployment scale-down before using the supported image")
+		return ctrl.Result{RequeueAfter: provisioningRequeueAfter}, errors.Join(r.withdrawAccess(ctx, inst), r.updateImagePolicyStatus(ctx, inst,
+			phaseProvisioning, "ImageMigration", "Waiting for Deployment scale-down before using the supported image"))
 	}
 
 	// Select and check the route before credentials or workload reconciliation.
-	slug, err := r.ensureSlug(ctx, inst)
+	instanceHost, err := r.selectedInstanceHost(ctx, inst)
 	if err != nil {
-		return r.hostnameFailure(ctx, inst, err)
+		return r.stopForHostnameFailure(ctx, inst, err)
 	}
-	instanceHost, err := r.instanceHost(slug)
+	access, err := r.prepareAccess(ctx, inst, instanceHost)
 	if err != nil {
-		return ctrl.Result{}, err
+		return r.denyAccess(ctx, inst, err)
 	}
-	if err := r.checkHostname(ctx, inst, instanceHost); err != nil {
-		return r.hostnameFailure(ctx, inst, err)
+	if inst.Spec.Replicas > 1 {
+		return r.denyAccess(ctx, inst, errors.New("authenticated Chat UI requires one replica until shared application storage is configured"))
 	}
 
 	// Ensure finalizer
@@ -201,14 +206,17 @@ func (r *ChatUIInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	// Reconcile Deployment
-	if err := r.reconcileDeployment(ctx, inst, labels, replicas, image, secretChecksum); err != nil {
-		return ctrl.Result{}, err
+	if err := r.reconcileDeployment(ctx, inst, labels, replicas, image, secretChecksum, access); err != nil {
+		if errors.Is(err, errAccessCutover) {
+			return ctrl.Result{RequeueAfter: provisioningRequeueAfter}, r.updateImagePolicyStatus(ctx, inst, phaseProvisioning, "AccessMigration", "Waiting for prior pods to stop before access migration")
+		}
+		return r.denyAccess(ctx, inst, err)
 	}
 
 	// Reconcile Service
 	svcName := fmt.Sprintf("%s-chatui", inst.Name)
 	if err := r.reconcileService(ctx, inst, labels, svcName); err != nil {
-		return ctrl.Result{}, err
+		return r.denyAccess(ctx, inst, err)
 	}
 
 	// Reconcile Ingress
@@ -251,9 +259,31 @@ func (r *ChatUIInstanceReconciler) startTracing(ctx context.Context) (context.Co
 	return ctx, span
 }
 
+func (r *ChatUIInstanceReconciler) selectedInstanceHost(ctx context.Context, inst *uiapiv1alpha1.ChatUIInstance) (string, error) {
+	slug, err := r.ensureSlug(ctx, inst)
+	if err != nil {
+		return "", err
+	}
+	host, err := r.instanceHost(slug)
+	if err != nil {
+		return "", err
+	}
+	return host, r.checkHostname(ctx, inst, host)
+}
+
+func (r *ChatUIInstanceReconciler) stopForHostnameFailure(ctx context.Context, inst *uiapiv1alpha1.ChatUIInstance, cause error) (ctrl.Result, error) {
+	withdrawalErr := r.withdrawAccess(ctx, inst)
+	if errors.Is(withdrawalErr, errIngressNotOwned) {
+		withdrawalErr = nil
+	}
+	_, stopErr := r.stopUnapprovedDeployment(ctx, inst, true)
+	result, statusErr := r.hostnameFailure(ctx, inst, cause)
+	return result, errors.Join(withdrawalErr, stopErr, statusErr)
+}
+
 func (r *ChatUIInstanceReconciler) getInstance(ctx context.Context, name types.NamespacedName) (*uiapiv1alpha1.ChatUIInstance, bool, error) {
 	inst := &uiapiv1alpha1.ChatUIInstance{}
-	if err := r.Get(ctx, name, inst); err != nil {
+	if err := r.routeReader().Get(ctx, name, inst); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, false, nil
 		}
@@ -299,17 +329,18 @@ func uiLabels(instanceName string) map[string]string {
 	}
 }
 
-func (r *ChatUIInstanceReconciler) reconcileDeployment(ctx context.Context, inst *uiapiv1alpha1.ChatUIInstance, labels map[string]string, replicas int32, image string, secretChecksum string) error {
+func (r *ChatUIInstanceReconciler) reconcileDeployment(ctx context.Context, inst *uiapiv1alpha1.ChatUIInstance, labels map[string]string, replicas int32, image string, secretChecksum string, access *accessBundle) error {
 	logger := log.FromContext(ctx)
 	deployName := fmt.Sprintf("%s-chatui", inst.Name)
 
 	var existing appsv1.Deployment
 	key := client.ObjectKey{Namespace: inst.Namespace, Name: deployName}
-	if err := r.Get(ctx, key, &existing); err != nil {
+	if err := r.routeReader().Get(ctx, key, &existing); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
 		deploy := buildDeployment(inst, labels, replicas, image, secretChecksum)
+		applyAccessDeployment(&deploy, inst, access, r.AccessPolicy.ProxyImage)
 		if err := ctrl.SetControllerReference(inst, &deploy, r.Scheme); err != nil {
 			return err
 		}
@@ -319,68 +350,36 @@ func (r *ChatUIInstanceReconciler) reconcileDeployment(ctx context.Context, inst
 		logger.Info("created Chat UI Deployment", "name", deployName)
 		return nil
 	}
-	updated := false
 	desired := buildDeployment(inst, labels, replicas, image, secretChecksum)
-	desiredContainer := desired.Spec.Template.Spec.Containers[0]
-
-	// Check if checksum annotation needs update (triggers pod rollout)
-	currentChecksum := ""
-	if existing.Spec.Template.Annotations != nil {
-		currentChecksum = existing.Spec.Template.Annotations[secretChecksumAnnotation]
+	applyAccessDeployment(&desired, inst, access, r.AccessPolicy.ProxyImage)
+	if !ownedByInstance(&existing, inst) {
+		return errDeploymentNotOwned
 	}
-	if currentChecksum != secretChecksum {
-		if existing.Spec.Template.Annotations == nil {
-			existing.Spec.Template.Annotations = map[string]string{}
+	template := managedAccessTemplate(existing.Spec.Template, desired.Spec.Template)
+	if !reflect.DeepEqual(existing.Spec.Template, template) || existing.Spec.Strategy.Type != appsv1.RecreateDeploymentStrategyType {
+		waiting, err := r.waitForAccessCutover(ctx, inst, &existing)
+		if err != nil {
+			return err
 		}
-		existing.Spec.Template.Annotations[secretChecksumAnnotation] = secretChecksum
-		updated = true
-		logger.Info("secret checksum changed, triggering rollout",
-			"deployment", deployName,
-			"oldChecksum", currentChecksum,
-			"newChecksum", secretChecksum)
-	}
-
-	if existing.Spec.Replicas == nil || *existing.Spec.Replicas != replicas {
-		existing.Spec.Replicas = ptrTo(replicas)
-		updated = true
-	}
-	for i := range existing.Spec.Template.Spec.Containers {
-		c := &existing.Spec.Template.Spec.Containers[i]
-		if c.Name != "open-webui" {
-			continue
+		if waiting {
+			return errAccessCutover
 		}
-		if c.Image != image {
-			c.Image = image
-			updated = true
-		}
-		if !reflect.DeepEqual(c.Env, desiredContainer.Env) {
-			c.Env = desiredContainer.Env
-			updated = true
-			logger.Info("updated managed Open WebUI environment", "deployment", deployName)
-		}
-		if ensureChatUIContainerProbes(c) {
-			updated = true
-		}
-	}
-	if !updated {
+		existing.Spec.Template = template
+		existing.Spec.Strategy = desired.Spec.Strategy
+	} else if existing.Spec.Replicas != nil && *existing.Spec.Replicas == replicas {
 		return nil
 	}
+	existing.Spec.Replicas = ptrTo(replicas)
 	return r.Update(ctx, &existing)
 }
 
 func buildDeployment(inst *uiapiv1alpha1.ChatUIInstance, labels map[string]string, replicas int32, image string, secretChecksum string) appsv1.Deployment {
 	secretName := inst.Spec.CredentialsSecretRef.Name
-	// Derive a stable 32-byte WEBUI_SECRET_KEY from the instance UID so JWT
-	// sessions survive pod restarts. Upstream Open WebUI generates an
-	// ephemeral 16-byte key when the env var is empty and logs an
-	// InsecureKeyLengthWarning.
-	webUIKeyDigest := sha256.Sum256([]byte("ui.privatellms.msp/webui-secret-key:" + string(inst.UID)))
-	webUISecretKey := hex.EncodeToString(webUIKeyDigest[:])
 	envVars := []corev1.EnvVar{
 		// Core auth + connector settings
-		{Name: "WEBUI_AUTH", Value: "false"},
-		{Name: "WEBUI_SECRET_KEY", Value: webUISecretKey},
-		{Name: "ENABLE_OPENAI_API", Value: "true"},
+		{Name: "WEBUI_AUTH", Value: trueValue},
+		{Name: "WEBUI_SECRET_KEY", ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{LocalObjectReference: corev1.LocalObjectReference{Name: sessionSecretName(inst)}, Key: "webui-secret"}}},
+		{Name: "ENABLE_OPENAI_API", Value: trueValue},
 		{Name: "ENABLE_OLLAMA_API", Value: "false"},
 		{Name: "ENABLE_DIRECT_CONNECTIONS", Value: "false"},
 
@@ -552,9 +551,11 @@ func buildDeployment(inst *uiapiv1alpha1.ChatUIInstance, labels map[string]strin
 
 func (r *ChatUIInstanceReconciler) reconcileService(ctx context.Context, inst *uiapiv1alpha1.ChatUIInstance, labels map[string]string, svcName string) error {
 	logger := log.FromContext(ctx)
+	labels = copyStringMap(labels)
+	labels["ui.privatellms.msp/instance-uid"] = string(inst.UID)
 	var svc corev1.Service
 	key := client.ObjectKey{Namespace: inst.Namespace, Name: svcName}
-	if err := r.Get(ctx, key, &svc); err != nil {
+	if err := r.routeReader().Get(ctx, key, &svc); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -581,6 +582,17 @@ func (r *ChatUIInstanceReconciler) reconcileService(ctx context.Context, inst *u
 			return err
 		}
 		logger.Info("created Chat UI Service", "name", svcName)
+		return nil
+	}
+	if !ownedByInstance(&svc, inst) {
+		return errors.New("backend Service is not owned by this instance")
+	}
+	ports := []corev1.ServicePort{{Name: "http", Port: 8080, TargetPort: intstr.FromInt(8080), Protocol: corev1.ProtocolTCP}}
+	if svc.Spec.Type != corev1.ServiceTypeClusterIP || svc.Spec.ExternalName != "" ||
+		!reflect.DeepEqual(svc.Spec.Selector, labels) || !reflect.DeepEqual(svc.Spec.Ports, ports) {
+		svc.Spec.Type, svc.Spec.ExternalName = corev1.ServiceTypeClusterIP, ""
+		svc.Spec.Selector, svc.Spec.Ports = labels, ports
+		return r.Update(ctx, &svc)
 	}
 	return nil
 }
@@ -706,8 +718,8 @@ func (r *ChatUIInstanceReconciler) ensureIngressAnnotations(ing *networkingv1.In
 		updated = true
 	}
 	if isHTTPS {
-		if ing.Annotations["traefik.ingress.kubernetes.io/router.tls"] != "true" {
-			ing.Annotations["traefik.ingress.kubernetes.io/router.tls"] = "true"
+		if ing.Annotations["traefik.ingress.kubernetes.io/router.tls"] != trueValue {
+			ing.Annotations["traefik.ingress.kubernetes.io/router.tls"] = trueValue
 			updated = true
 		}
 	} else if _, exists := ing.Annotations["traefik.ingress.kubernetes.io/router.tls"]; exists {
@@ -834,7 +846,7 @@ func (r *ChatUIInstanceReconciler) evaluateInstanceReadiness(ctx context.Context
 		return false, "ServiceEndpointsMissing", message, nil
 	}
 
-	probeURL := r.serviceProbeURL(inst.Namespace, svcName, 8080, "/")
+	probeURL := r.serviceProbeURL(inst.Namespace, svcName, 8080, "/ping")
 	if err := r.runServiceHealthCheck(ctx, probeURL); err != nil {
 		return false, "HealthCheckFailed", fmt.Sprintf("Service probe failed for %s: %v", probeURL, err), nil
 	}
@@ -885,14 +897,15 @@ func defaultServiceHealthChecker(ctx context.Context, targetURL string) error {
 	if err != nil {
 		return err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	checker := &http.Client{Timeout: 3 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	resp, err := checker.Do(req)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
+	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code %d", resp.StatusCode)
 	}
 	return nil
@@ -961,6 +974,9 @@ func (r *ChatUIInstanceReconciler) instanceURL(host string) string {
 }
 
 func (r *ChatUIInstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.AccessPolicy == nil {
+		return errors.New("access policy is required")
+	}
 	if r.HostnamePolicy == nil {
 		return fmt.Errorf("hostname policy is required")
 	}
@@ -1040,17 +1056,17 @@ func ptrTo[T any](v T) *T {
 
 func ensureChatUIContainerProbes(c *corev1.Container) bool {
 	updated := false
-	readinessProbe := chatUIHTTPProbe(5, 2, 6)
+	readinessProbe := chatUIHTTPProbe(5, 6)
 	if !probesEqual(c.ReadinessProbe, readinessProbe) {
 		c.ReadinessProbe = readinessProbe
 		updated = true
 	}
-	startupProbe := chatUIHTTPProbe(10, 2, 60)
+	startupProbe := chatUIHTTPProbe(10, 60)
 	if !probesEqual(c.StartupProbe, startupProbe) {
 		c.StartupProbe = startupProbe
 		updated = true
 	}
-	livenessProbe := chatUIHTTPProbe(10, 2, 6)
+	livenessProbe := chatUIHTTPProbe(10, 6)
 	livenessProbe.InitialDelaySeconds = 20
 	if !probesEqual(c.LivenessProbe, livenessProbe) {
 		c.LivenessProbe = livenessProbe
@@ -1059,7 +1075,7 @@ func ensureChatUIContainerProbes(c *corev1.Container) bool {
 	return updated
 }
 
-func chatUIHTTPProbe(periodSeconds, timeoutSeconds, failureThreshold int32) *corev1.Probe {
+func chatUIHTTPProbe(periodSeconds, failureThreshold int32) *corev1.Probe {
 	return &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
@@ -1068,7 +1084,7 @@ func chatUIHTTPProbe(periodSeconds, timeoutSeconds, failureThreshold int32) *cor
 			},
 		},
 		PeriodSeconds:    periodSeconds,
-		TimeoutSeconds:   timeoutSeconds,
+		TimeoutSeconds:   2,
 		FailureThreshold: failureThreshold,
 	}
 }
