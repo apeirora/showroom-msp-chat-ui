@@ -452,6 +452,24 @@ func TestImagePolicyAdmission(t *testing.T) {
 	if err := c.Create(ctx, withoutSecret); !apierrors.IsInvalid(err) {
 		t.Fatalf("regeneration weakened required Secret-name validation: %v", err)
 	}
+	for _, replicas := range []int32{0, 1, 2} {
+		inst := &uiapi.ChatUIInstance{ObjectMeta: metav1.ObjectMeta{GenerateName: "replicas-", Namespace: "image-policy"},
+			Spec: uiapi.ChatUIInstanceSpec{Replicas: replicas, CredentialsSecretRef: uiapi.CredentialsSecretReference{Name: "synthetic"}}}
+		err := c.Create(ctx, inst)
+		if replicas > 1 {
+			if !apierrors.IsInvalid(err) {
+				t.Fatalf("admission accepted multiple replicas: %v", err)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatalf("admission rejected supported replicas: %v", err)
+		}
+		inst.Spec.Replicas = 2
+		if err := c.Update(ctx, inst); !apierrors.IsInvalid(err) {
+			t.Fatalf("admission accepted scaling to multiple replicas: %v", err)
+		}
+	}
 	for _, image := range append([]string{"", uiapi.SupportedImage}, rejectedImages...) {
 		inst := &uiapi.ChatUIInstance{ObjectMeta: metav1.ObjectMeta{GenerateName: "image-", Namespace: "image-policy"},
 			Spec: uiapi.ChatUIInstanceSpec{Image: image, CredentialsSecretRef: uiapi.CredentialsSecretReference{Name: "synthetic"}}}

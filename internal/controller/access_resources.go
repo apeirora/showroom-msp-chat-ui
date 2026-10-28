@@ -232,6 +232,14 @@ func (r *ChatUIInstanceReconciler) denyAccess(ctx context.Context, inst *uiapi.C
 	return ctrl.Result{RequeueAfter: hostnameRecheckAfter}, errors.Join(cause, withdrawErr, stopErr, statusErr)
 }
 
+func (r *ChatUIInstanceReconciler) rejectReplicas(ctx context.Context, inst *uiapi.ChatUIInstance) (ctrl.Result, error) {
+	withdrawErr := r.withdrawAccess(ctx, inst)
+	_, stopErr := r.stopUnapprovedDeployment(ctx, inst, true)
+	statusErr := r.updateImagePolicyStatus(ctx, inst, phaseError, "UnsupportedReplicas",
+		"Only one Chat UI replica is supported. Set spec.replicas to 1.")
+	return ctrl.Result{RequeueAfter: hostnameRecheckAfter}, errors.Join(withdrawErr, stopErr, statusErr)
+}
+
 func accessSecurityContext() *corev1.SecurityContext {
 	return &corev1.SecurityContext{AllowPrivilegeEscalation: ptrTo(false), RunAsNonRoot: ptrTo(true), RunAsUser: ptrTo(int64(65532)),
 		ReadOnlyRootFilesystem: ptrTo(true), Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}}}

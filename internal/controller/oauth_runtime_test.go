@@ -233,9 +233,21 @@ func TestPinnedOAuthRuntime(t *testing.T) {
 	if headers.Get(accessgate.EmailHeader) == "victim@example.test" || !strings.HasSuffix(headers.Get(accessgate.EmailHeader), "@chatui.invalid") || headers.Get(accessgate.RoleHeader) != "user" || headers.Get(accessgate.TokenHeader) != "" || strings.Contains(headers.Get("Cookie"), "chatui-session") || headers.Get("Authorization") != "Bearer native-webui-token" {
 		t.Fatal("identity isolation or native Authorization transport failed")
 	}
-	time.Sleep(1500 * time.Millisecond)
-	if code, _ := get("/"); code != 200 || minted.Load() < 2 {
-		t.Fatal("OIDC refresh failed to provide a current ID token")
+	// OAuth2 Proxy measures session age at whole-second precision. A fixed
+	// 1.5-second sleep can still fall short of its one-second refresh interval.
+	// Require successful requests throughout and bound the wait for actual refresh.
+	refreshDeadline := time.Now().Add(5 * time.Second)
+	for {
+		if code, _ := get("/"); code != http.StatusOK {
+			t.Fatalf("OIDC refresh request failed: HTTP %d", code)
+		}
+		if minted.Load() >= 2 {
+			break
+		}
+		if time.Now().After(refreshDeadline) {
+			t.Fatal("OIDC refresh failed to provide a current ID token")
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
 	grants.Store(false)
 	if code, _ := get("/"); code != 403 {

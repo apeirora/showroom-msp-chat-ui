@@ -92,6 +92,45 @@ func TestMissingAccessWithdrawsOwnedRouteAndStopsWorkload(t *testing.T) {
 	}
 }
 
+func TestUnsupportedReplicasWithdrawsExistingAccess(t *testing.T) {
+	ctx := context.Background()
+	inst := hostnameInstance("ui", "tenant", "uid")
+	r := hostnameReconciler(t, inst, hostnameCredentials(inst.Namespace))
+	reconcileHostname(t, r, inst)
+	_ = getHostnameIngress(t, r, inst)
+	// The fake client represents a stored object predating the maximum validation.
+	inst.Spec.Replicas = 2
+	if err := r.Update(ctx, inst); err != nil {
+		t.Fatal(err)
+	}
+	inst.Status.URL = "https://previous.example.test"
+	meta.SetStatusCondition(&inst.Status.Conditions, metav1.Condition{
+		Type: "Ready", Status: metav1.ConditionTrue, Reason: "Ready", Message: "Previous controller",
+	})
+	if err := r.Status().Update(ctx, inst); err != nil {
+		t.Fatal(err)
+	}
+	// A tenant-correctable spec error must remain clear even if access is unmapped.
+	r.AccessPolicy.Entries = nil
+	reconcileHostname(t, r, inst)
+	key := client.ObjectKey{Namespace: inst.Namespace, Name: inst.Name + "-chatui"}
+	if err := r.Get(ctx, key, &networkingv1.Ingress{}); !apierrors.IsNotFound(err) {
+		t.Fatalf("unsupported replicas retained route: %v", err)
+	}
+	var deployment appsv1.Deployment
+	if err := r.Get(ctx, key, &deployment); err != nil {
+		t.Fatal(err)
+	}
+	if deployment.Spec.Replicas == nil || *deployment.Spec.Replicas != 0 {
+		t.Fatal("unsupported replicas retained workload")
+	}
+	condition := meta.FindStatusCondition(inst.Status.Conditions, "Ready")
+	if inst.Status.URL != "" || condition == nil || condition.Status != metav1.ConditionFalse ||
+		condition.Reason != "UnsupportedReplicas" || !strings.Contains(condition.Message, "Set spec.replicas to 1") {
+		t.Fatal("unsupported replicas did not report the tenant correction")
+	}
+}
+
 func TestMigrationFailureWithdrawsPreviousRoute(t *testing.T) {
 	const foreignDeployment = "foreign-deployment"
 	for _, failure := range []string{"missing-reference", "missing-secret", foreignDeployment, "route-read-error"} {

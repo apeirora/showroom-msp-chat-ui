@@ -144,6 +144,9 @@ func (r *ChatUIInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{RequeueAfter: provisioningRequeueAfter}, errors.Join(r.withdrawAccess(ctx, inst), r.updateImagePolicyStatus(ctx, inst,
 			phaseProvisioning, "ImageMigration", "Waiting for Deployment scale-down before using the supported image"))
 	}
+	if inst.Spec.Replicas > 1 {
+		return r.rejectReplicas(ctx, inst)
+	}
 
 	// Select and check the route before credentials or workload reconciliation.
 	instanceHost, err := r.selectedInstanceHost(ctx, inst)
@@ -154,10 +157,6 @@ func (r *ChatUIInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if err != nil {
 		return r.denyAccess(ctx, inst, err)
 	}
-	if inst.Spec.Replicas > 1 {
-		return r.denyAccess(ctx, inst, errors.New("authenticated Chat UI requires one replica until shared application storage is configured"))
-	}
-
 	// Ensure finalizer
 	if !ctrlutil.ContainsFinalizer(inst, finalizerName) {
 		ctrlutil.AddFinalizer(inst, finalizerName)
@@ -203,7 +202,7 @@ func (r *ChatUIInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// Reconcile Ingress
 	if err := r.reconcileIngress(ctx, inst, labels, svcName, instanceHost, "/"); err != nil {
-		return r.hostnameFailure(ctx, inst, err)
+		return r.stopForHostnameFailure(ctx, inst, err)
 	}
 
 	ready, reason, message, err := r.evaluateInstanceReadiness(ctx, inst, svcName, instanceHost)

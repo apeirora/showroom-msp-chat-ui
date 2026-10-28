@@ -72,9 +72,10 @@ spec:
                 type: string
               replicas:
                 default: 1
-                description: Replicas configures the number of UI pods. Defaults to
-                  1.
+                description: Replicas supports one UI pod; zero uses the default of
+                  one pod.
                 format: int32
+                maximum: 1
                 minimum: 0
                 type: integer
             required:

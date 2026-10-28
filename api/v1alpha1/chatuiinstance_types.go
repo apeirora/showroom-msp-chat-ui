@@ -36,8 +36,9 @@ type ChatUIInstanceSpec struct {
 	// The Secret must be in the same namespace.
 	CredentialsSecretRef CredentialsSecretReference `json:"credentialsSecretRef"`
 
-	// Replicas configures the number of UI pods. Defaults to 1.
+	// Replicas supports one UI pod; zero uses the default of one pod.
 	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=1
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas,omitempty"`
 

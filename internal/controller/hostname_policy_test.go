@@ -202,6 +202,84 @@ func TestHostnameUncachedReadFailureDoesNotPublishOrLeak(t *testing.T) {
 	}
 }
 
+type lateHostnameReader struct {
+	client.Client
+	reads    int
+	conflict *networkingv1.Ingress
+}
+
+func (r *lateHostnameReader) List(ctx context.Context, objects client.ObjectList, options ...client.ListOption) error {
+	if _, ok := objects.(*networkingv1.IngressList); ok {
+		r.reads++
+		if r.reads == 2 {
+			if r.conflict == nil {
+				return errors.New("synthetic late hostname read failure")
+			}
+			if err := r.Create(ctx, r.conflict); err != nil {
+				return err
+			}
+		}
+	}
+	return r.Client.List(ctx, objects, options...)
+}
+
+func TestHostnameLateFailureWithdrawsExistingAccess(t *testing.T) {
+	const ready = "Ready"
+	for _, conflict := range []bool{false, true} {
+		t.Run(fmt.Sprint(conflict), func(t *testing.T) {
+			ctx := context.Background()
+			inst := hostnameInstance("ui", "tenant", "uid")
+			r := hostnameReconciler(t, inst, hostnameCredentials(inst.Namespace))
+			reconcileHostname(t, r, inst)
+			reconcileHostname(t, r, inst)
+			ingress := getHostnameIngress(t, r, inst)
+			inst.Status.URL, inst.Status.Phase = "https://"+ingress.Spec.Rules[0].Host, ready
+			meta.SetStatusCondition(&inst.Status.Conditions, metav1.Condition{
+				Type: ready, Status: metav1.ConditionTrue, Reason: ready, Message: ready,
+			})
+			if err := r.Status().Update(ctx, inst); err != nil {
+				t.Fatal(err)
+			}
+			reader := &lateHostnameReader{Client: r.Client}
+			if conflict {
+				reader.conflict = &networkingv1.Ingress{
+					ObjectMeta: metav1.ObjectMeta{Name: "foreign", Namespace: "other"},
+					Spec:       networkingv1.IngressSpec{Rules: []networkingv1.IngressRule{{Host: ingress.Spec.Rules[0].Host}}},
+				}
+			}
+			r.RouteReader = reader
+			_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(inst)})
+			if reader.reads != 2 || (err == nil) != conflict {
+				t.Fatalf("did not exercise late hostname failure: reads=%d err=%v", reader.reads, err)
+			}
+			key := client.ObjectKeyFromObject(ingress)
+			if err := r.Get(ctx, key, &networkingv1.Ingress{}); !apierrors.IsNotFound(err) {
+				t.Fatalf("late hostname failure retained existing route: %v", err)
+			}
+			var deployment appsv1.Deployment
+			if err := r.Get(ctx, key, &deployment); err != nil {
+				t.Fatal(err)
+			}
+			if deployment.Spec.Replicas == nil || *deployment.Spec.Replicas != 0 {
+				t.Fatal("late hostname failure retained running workload")
+			}
+			if err := r.Get(ctx, client.ObjectKeyFromObject(inst), inst); err != nil {
+				t.Fatal(err)
+			}
+			if inst.Status.URL != "" || !meta.IsStatusConditionFalse(inst.Status.Conditions, ready) {
+				t.Fatal("late hostname failure retained ready status")
+			}
+			if conflict {
+				var foreign networkingv1.Ingress
+				if err := r.Get(ctx, client.ObjectKeyFromObject(reader.conflict), &foreign); err != nil ||
+					!reflect.DeepEqual(foreign.Spec, reader.conflict.Spec) {
+					t.Fatal("late hostname failure changed foreign route")
+				}
+			}
+		})
+	}
+}
+
 func TestHostnameOwnedRouteConvergesToOneBackend(t *testing.T) {
 	inst := hostnameInstance("demo", "account-a", "demo-uid")
 	r := hostnameReconciler(t, inst)

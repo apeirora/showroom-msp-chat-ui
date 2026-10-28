@@ -12,8 +12,6 @@ name = 'chatui-792-test-' + secrets.token_hex(5)
 browser_python = os.environ.get('CHATUI_BROWSER_PYTHON')
 with tempfile.TemporaryDirectory(prefix='chatui-792-') as temporary:
     temp = Path(temporary)
-    (temp / 'data').mkdir(mode=0o777)
-    (temp / 'data').chmod(0o777)  # disposable fixture only; runtime uses fsGroup
     env = temp / 'environment'
     env.write_text('\n'.join([
         'WEBUI_SECRET_KEY=' + secrets.token_urlsafe(32), 'WEBUI_AUTH=true',
@@ -44,7 +42,10 @@ with tempfile.TemporaryDirectory(prefix='chatui-792-') as temporary:
     try:
         subprocess.run(['docker', 'run', '-d', '--name', name, *network, '--user=1000:1000',
             '--cap-drop=ALL', '--security-opt=no-new-privileges', '--env-file', str(env),
-            '--tmpfs=/tmp:uid=1000,gid=1000', '-v', str(temp / 'data') + ':/app/backend/data',
+            '--tmpfs=/tmp:uid=1000,gid=1000',
+            # Match disposable pod storage without leaving container-owned files
+            # on runners whose host UID differs from the application's UID.
+            '--tmpfs=/app/backend/data:uid=1000,gid=1000,mode=0700',
             '-v', str(ROOT / 'internal/webuiguard') + ':/etc/chat-ui-guard:ro',
             '--entrypoint=python', IMAGE, '-m', 'uvicorn', 'chatui_guard:app',
             '--app-dir=/etc/chat-ui-guard', '--host=127.0.0.1', '--port=8081', '--workers=1'],
