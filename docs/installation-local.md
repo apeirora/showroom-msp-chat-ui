@@ -158,6 +158,11 @@ kubectl get chatuiinstances -w
 
 ## Access the Chat UI
 
+The sync agent's `syncagent.kcp.io/remote-object-namespace` and
+`syncagent.kcp.io/remote-object-name` annotations help locate candidate runtime
+objects. Treat them as lookup hints; verify the workspace and both object UIDs
+through trusted API access before approving a mapping.
+
 After the source and MSP objects exist, read both identities through trusted access
 and add their exact UIDs, namespaces and names to the reviewed access policy. Do not
 infer authorization mappings from tenant annotations. Apply the policy update,
