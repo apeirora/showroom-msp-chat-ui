@@ -173,20 +173,20 @@ helm upgrade --install chat-ui-operator \
   --set env.PUBLIC_SCHEME=https \
   --set env.TLS_SECRET_NAME="chat-ui-tls"
 
-# 2. Sync Agent (on MSP cluster)
+# 2. PM Integration (applied to KCP provider workspace)
+helm upgrade --install chat-ui-pm-integration \
+  oci://ghcr.io/apeirora/charts/chat-ui-pm-integration \
+  --version "$VERSION" \
+  --set publicHost="chat-ui.example.com" \
+  --set publicScheme=https
+
+# 3. Sync Agent (on MSP cluster)
 helm upgrade --install chat-ui-sync-agent \
   oci://ghcr.io/apeirora/charts/chat-ui-sync-agent \
   --namespace chat-ui \
   --version "$VERSION" \
   --set publishedResources.namespace=api-syncagent \
   --set syncAgentOperator.kcpKubeconfig=pm-kcp-kubeconfig
-
-# 3. PM Integration (applied to KCP provider workspace)
-helm upgrade --install chat-ui-pm-integration \
-  oci://ghcr.io/apeirora/charts/chat-ui-pm-integration \
-  --version "$VERSION" \
-  --set publicHost="chat-ui.example.com" \
-  --set publicScheme=https
 
 # 4. Portal UI (on MSP cluster)
 helm upgrade --install chat-ui-ui \
