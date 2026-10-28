@@ -174,6 +174,7 @@ portalIntegration:
 
 class OCMInstallerImage(unittest.TestCase):
     values = '''component:
+  repositoryUrl: ghcr.io/apeirora/ocm
   semver: "0.14.4-rc.1"
 operator:
   accessPolicy:
@@ -183,11 +184,26 @@ operator:
   imagePullSecretName: ghcr-credentials
 '''
 
-    def rewrite(self, text, repository="ghcr.io/apeirora/chat-ui-controller"):
+    def rewrite(self, text, repository="ghcr.io/apeirora/chat-ui-controller", ocm_repository=None):
         spec = importlib.util.spec_from_file_location("release_images", SET_IMAGE)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        return module.ocm_release_values(text, "0.14.4-rc.1", repository)
+        if ocm_repository is None:
+            ocm_repository = "oci://" + repository.removesuffix("/chat-ui-controller") + "/ocm"
+        return module.ocm_release_values(text, "0.14.4-rc.1", repository, ocm_repository)
+
+    def rewrite_cli(self, text, ocm_repository="oci://ghcr.io/fork-team/ocm"):
+        with tempfile.TemporaryDirectory() as tmp:
+            operator, installer = Path(tmp) / "values.yaml", Path(tmp) / "ocm.yaml"
+            operator.write_text(PackagedImageVersion.values, encoding="utf-8")
+            installer.write_text(text, encoding="utf-8")
+            before = operator.read_bytes(), installer.read_bytes()
+            proc = subprocess.run(
+                ["python3", str(SET_IMAGE), str(operator), "0.14.4-rc.1",
+                 "--repository", "ghcr.io/fork-team/chat-ui-controller", "--ocm-values", str(installer),
+                 "--ocm-repository", ocm_repository], capture_output=True, text=True, check=False,
+            )
+            return proc, before, (operator.read_bytes(), installer.read_bytes())
 
     def test_installer_selects_published_repository_and_version(self):
         for owner in ("apeirora", "fork-team"):
@@ -195,6 +211,7 @@ operator:
             after = self.rewrite(self.values, repository)
             self.assertIn('  imageRepository: "' + repository + '"\n', after)
             self.assertIn('  imageTag: "0.14.4-rc.1"\n', after)
+            self.assertIn(f'  repositoryUrl: "ghcr.io/{owner}/ocm"\n', after)
             self.assertIn("    proxyImage: ''\n", after)
             self.assertIn('  semver: "0.14.4-rc.1"\n', after)
 
@@ -211,6 +228,63 @@ operator:
             with self.subTest(text=text), self.assertRaises(ValueError):
                 self.rewrite(text)
 
+    def test_cli_fork_component_source_matches_publication(self):
+        proc, _, (operator, installer) = self.rewrite_cli(self.values)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn(b'repository: "ghcr.io/fork-team/chat-ui-controller"', operator)
+        self.assertIn(b'repositoryUrl: "ghcr.io/fork-team/ocm"', installer)
+        self.assertNotIn(b"oci://", installer)
+        self.assertNotIn(b"ghcr.io/apeirora/", installer)
+
+    def test_ocm_source_is_explicit_not_inferred_from_image(self):
+        after = self.rewrite(self.values, "ghcr.io/fork-team/chat-ui-controller", "oci://ghcr.io/publisher/ocm")
+        self.assertIn('repositoryUrl: "ghcr.io/publisher/ocm"', after)
+        self.assertIn('imageRepository: "ghcr.io/fork-team/chat-ui-controller"', after)
+
+    def test_invalid_component_repositories_leave_both_files_unchanged(self):
+        for repository in (
+            "", "oci://", "oci://oci://ghcr.io/owner/ocm", "https://ghcr.io/owner/ocm",
+            "oci://ghcr.io/Fork-Team/ocm", "ghcr.io/-owner/ocm", "ghcr.io/owner-/ocm",
+            "ghcr.io/" + "a" * 40 + "/ocm", "ghcr.io/owner/charts", "ghcr.io/owner/ocm/",
+            "ghcr.io/owner/ocm:v1", "ghcr.io/owner/ocm@sha256:" + "a" * 64,
+            "docker.io/owner/ocm", "ghcr.io/owner/ocm?next=other", "ghcr.io/owner/ocm\nother: injected",
+        ):
+            with self.subTest(repository=repository):
+                proc, before, after = self.rewrite_cli(self.values, repository)
+                self.assertNotEqual(proc.returncode, 0)
+                self.assertEqual(after, before)
+
+    def test_component_schema_drift_leaves_both_files_unchanged(self):
+        field = "  repositoryUrl: ghcr.io/apeirora/ocm"
+        for text in (
+            self.values.replace("component:\n", "source:\n", 1),
+            self.values.replace("component:\n", "component: {}\n", 1),
+            self.values.replace("component:\n", "'component':\n", 1),
+            self.values + "component:\n" + field + "\n",
+            self.values + "'component':\n" + field + "\n",
+            self.values.replace(field, field + "\n" + field),
+            self.values.replace(field, field + "\n  'repositoryUrl': ghcr.io/apeirora/ocm"),
+            self.values.replace(field, '  "repositoryUrl": ghcr.io/apeirora/ocm'),
+            self.values.replace(field, "    repositoryUrl: ghcr.io/apeirora/ocm"),
+            self.values.replace(field, "  repositoryUrl: &repo ghcr.io/apeirora/ocm"),
+            self.values.replace(field, "  repositoryUrl: *repo"),
+            self.values.replace(field, "  repositoryUrl: {}"),
+            self.values.replace(field, "  repositoryUrl: oci://ghcr.io/apeirora/ocm"),
+            self.values.replace(field, field + "#not-a-comment"),
+        ):
+            with self.subTest(text=text):
+                proc, before, after = self.rewrite_cli(text)
+                self.assertNotEqual(proc.returncode, 0)
+                self.assertEqual(after, before)
+
+    def test_component_repository_comments_and_nested_content_preserved(self):
+        for quoting in ("'", '"'):
+            text = self.values.replace("  repositoryUrl: ghcr.io/apeirora/ocm",
+                                       "  repositoryUrl: " + quoting + "ghcr.io/apeirora/ocm" + quoting + " # Zürich")
+            after = self.rewrite(text, "ghcr.io/fork-team/chat-ui-controller")
+            self.assertIn('  repositoryUrl: "ghcr.io/fork-team/ocm" # Zürich\n', after)
+            self.assertIn("    proxyImage: ''\n", after)
+
     def test_invalid_installer_leaves_both_files_unchanged(self):
         with tempfile.TemporaryDirectory() as tmp:
             operator, installer = Path(tmp) / "values.yaml", Path(tmp) / "ocm.yaml"
@@ -218,7 +292,8 @@ operator:
             installer.write_text(self.values.replace('  imageTag: ""', '  imageTag: latest'))
             before = installer.read_text()
             proc = subprocess.run(["python3", str(SET_IMAGE), str(operator), "0.14.4-rc.1",
-                                   "--repository", "ghcr.io/apeirora/chat-ui-controller", "--ocm-values", str(installer)],
+                                   "--repository", "ghcr.io/apeirora/chat-ui-controller", "--ocm-values", str(installer),
+                                   "--ocm-repository", "oci://ghcr.io/apeirora/ocm"],
                                   capture_output=True, text=True, check=False)
             self.assertNotEqual(proc.returncode, 0)
             self.assertEqual(operator.read_text(), PackagedImageVersion.values)
@@ -232,6 +307,23 @@ operator:
         self.assertIn('  tag: "0.14.4-rc.1"', after)
         self.rewrite((root / "charts/chat-ui-operator-ocm/values.yaml").read_text())
 
+    def test_cli_preserves_utf8_values_under_ascii_locale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            operator, installer = Path(tmp) / "values-é.yaml", Path(tmp) / "ocm-ñ.yaml"
+            note = "# Zürich — café 東京\n"
+            operator.write_text(note + PackagedImageVersion.values, encoding="utf-8")
+            installer.write_text(note + self.values, encoding="utf-8")
+            proc = subprocess.run(
+                ["python3", str(SET_IMAGE), str(operator), "0.14.4-rc.1",
+                 "--repository", "ghcr.io/apeirora/chat-ui-controller", "--ocm-values", str(installer),
+                 "--ocm-repository", "oci://ghcr.io/apeirora/ocm"],
+                env={**os.environ, "LC_ALL": "C", "PYTHONUTF8": "0", "PYTHONCOERCECLOCALE": "0"},
+                capture_output=True, text=True, check=False,
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertTrue(operator.read_bytes().startswith(note.encode("utf-8")))
+            self.assertTrue(installer.read_bytes().startswith(note.encode("utf-8")))
+
 
 class ReleaseWorkflowContract(unittest.TestCase):
     def test_prerelease_and_stable_guards_are_wired(self):
@@ -243,6 +335,10 @@ class ReleaseWorkflowContract(unittest.TestCase):
         self.assertIn('"latest": ${PUBLISH_LATEST}', workflow)
         self.assertIn("prerelease: ${{ needs.publish-image.outputs.publish_latest != 'true' }}", workflow)
         self.assertIn("make_latest: ${{ needs.publish-image.outputs.publish_latest }}", workflow)
+        package_job = workflow.split("  package-chart:\n", 1)[1].split("  publish-release:\n", 1)[0]
+        self.assertIn("OCM_REPOSITORY: ${{ needs.publish-image.outputs.ocm_repository }}", package_job)
+        self.assertIn('--ocm-repository "$OCM_REPOSITORY"', package_job)
+        self.assertLess(package_job.index("--ocm-repository"), package_job.index("helm dependency update"))
         self.assertLess(workflow.index("python3 hack/set-release-image.py"), workflow.index('for sub in charts/*/'))
         config = json.loads((root / "release-please-config.json").read_text())["packages"]["."]
         if config.get("release-as"):
