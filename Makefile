@@ -137,9 +137,17 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 build: manifests generate fmt vet ## Build manager binary.
 	go build -ldflags "-X main.version=$(VERSION)" -o bin/manager cmd/main.go
 
+# Prepared JSON policies are required even when running outside the cluster.
+export HOSTNAME_POLICY_FILE ?=
+export ACCESS_POLICY_FILE ?=
+
 .PHONY: run
-run: manifests generate fmt vet ## Run a controller from your host.
-	go run -ldflags "-X main.version=$(VERSION)" ./cmd/main.go
+run: manifests generate fmt vet ## Run locally with HOSTNAME_POLICY_FILE and ACCESS_POLICY_FILE.
+	@: "$${HOSTNAME_POLICY_FILE:?Set HOSTNAME_POLICY_FILE to a prepared JSON policy}"
+	@: "$${ACCESS_POLICY_FILE:?Set ACCESS_POLICY_FILE to a prepared JSON policy}"
+	go run -ldflags "-X main.version=$(VERSION)" ./cmd/main.go \
+		--hostname-policy-file="$$HOSTNAME_POLICY_FILE" \
+		--access-policy-file="$$ACCESS_POLICY_FILE"
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.

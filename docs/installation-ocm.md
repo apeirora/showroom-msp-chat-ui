@@ -11,6 +11,9 @@ Deploy the Chat UI Operator using the [Open Component Model](https://ocm.softwar
   - [Flux](https://fluxcd.io/) controllers (source-controller, helm-controller)
 - `kubectl`, `helm` 3.12+
 - `GITHUB_TOKEN` with read access to GHCR packages
+- The [access-policy prerequisites](access-policy.md): verified HTTPS KCP/issuer
+  endpoints, trusted ingress TLS, reviewed source-instance mappings, registered
+  OIDC clients and delivery of their `client_secret` Secrets.
 
 > **Note**: KRO is **not** required. The chart uses the OCM controller's built-in `FluxDeployer` to create the `HelmRelease` directly.
 
@@ -68,6 +71,14 @@ default is a hold on the previous release, not a fixed version of this finding.
 After inventory and schema upgrade, select the exact reviewed release containing
 the fix and provide its policy. Fresh installs also need a fixed API-server cutoff
 before creating instances; they may use an empty entries list.
+Also prepare `operator.accessPolicy` below. Use the controller/access-proxy image
+digest from that exact reviewed release, not the OAuth2 Proxy image. Provision
+its credential namespace separately from every instance namespace. The platform
+owner must register clients with exact owned-host callback URIs and a KCP-accepted
+audience, then deliver the referenced `client_secret` Secrets through existing
+platform delivery or scoped ESO SecretStores. No secret values belong in this file.
+Empty access entries permit manager startup but leave all instances inaccessible;
+add reviewed MSP and KCP source UID mappings before browser acceptance.
 
 ```yaml
 component:
@@ -77,6 +88,13 @@ operator:
   hostnamePolicy:
     cutover: '' # Required fixed timestamp; an empty value refuses manager startup.
     entries: [] # Reviewed legacy mappings for an existing installation.
+  accessPolicy:
+    kcpServer: https://kcp.example.test # Actual verified HTTPS origin, without a path.
+    kcpCA: '' # Optional PEM CA for KCP; otherwise system trust.
+    credentialsNamespace: chat-ui-credentials
+    proxyImage: ghcr.io/apeirora/chat-ui-controller@sha256:<reviewed-controller-image-digest>
+    entries: [] # Reviewed MSP/source identities, issuer and client-secret references.
+  clientSecrets: [] # Optional delivery through existing scoped ESO SecretStores.
   targetNamespace: chat-ui
   publicHost: chat-ui.example.com
   publicScheme: https
@@ -107,6 +125,8 @@ operator:
 | `operator.imageTag` | Operator image tag | `""` (uses chart default) |
 | `operator.ingressExtraAnnotations` | Extra ingress annotations | `{}` |
 | `operator.hostnamePolicy` | Required fixed cutoff and legacy mappings | Empty cutoff; refuses startup |
+| `operator.accessPolicy` | Required KCP origin, credential namespace, pinned proxy image and mappings | Empty required fields; refuses startup |
+| `operator.clientSecrets` | Optional delivery through existing scoped SecretStores | `[]` |
 
 ## Step 3: Install via Helm
 
@@ -168,15 +188,23 @@ export GH_OWNER=apeirora
 # Set VERSION to the exact reviewed release and HOSTNAME_POLICY_CUTOVER to the fixed inventory timestamp.
 : "${VERSION:?Set an exact reviewed release}"
 : "${HOSTNAME_POLICY_CUTOVER:?Set the reviewed fixed cutoff}"
-export VERSION HOSTNAME_POLICY_CUTOVER
+: "${CHAT_UI_KCP_SERVER:?Set the verified HTTPS KCP origin without a path}"
+: "${CHAT_UI_CONTROLLER_IMAGE_DIGEST:?Set the released controller image reference including @sha256 digest}"
+export VERSION HOSTNAME_POLICY_CUTOVER CHAT_UI_KCP_SERVER CHAT_UI_CONTROLLER_IMAGE_DIGEST
 
-envsubst < ocm/bootstrap.yaml | kubectl apply -f -
+envsubst '${GH_OWNER} ${VERSION} ${HOSTNAME_POLICY_CUTOVER} ${CHAT_UI_KCP_SERVER} ${CHAT_UI_CONTROLLER_IMAGE_DIGEST}' \
+  < "ocm/bootstrap.yaml" | kubectl apply -f -
 ```
 
 This creates the same three resources (`ComponentVersion`, `Resource`, `FluxDeployer`).
 Before applying, edit the `FluxDeployer`'s `.spec.helmReleaseTemplate.values.hostnamePolicy.entries`
 to include every reviewed legacy mapping, and customize the operator settings.
-An empty entries list is only sufficient for a fresh install with no legacy objects.
+Also fill `values.accessPolicy.entries` with reviewed identities and client-secret
+references and arrange credential delivery. The bootstrap uses `chat-ui` as its
+credential namespace; it must be separate from every instance namespace. Change
+that operator-owned setting before applying if the target uses a different scope.
+An empty hostname entries list is only sufficient for a fresh install with no legacy
+objects; empty access entries never grant browser access.
 
 ## Component Structure
 
@@ -218,7 +246,8 @@ helm upgrade --install chat-ui-operator \
   oci://ghcr.io/apeirora/charts/chat-ui-operator \
   --namespace chat-ui --create-namespace \
   --version "$VERSION" \
-  -f hostname-policy-values.yaml \
+  -f "hostname-policy-values.yaml" \
+  -f "access-policy-values.yaml" \
   --set env.PUBLIC_HOST="chat-ui.example.com" \
   --set env.PUBLIC_SCHEME=https \
   --set env.TLS_SECRET_NAME="chat-ui-tls"

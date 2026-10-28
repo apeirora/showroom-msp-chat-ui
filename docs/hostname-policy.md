@@ -7,16 +7,20 @@ so tenant metadata synchronization does not become an ownership mechanism.
 
 New names are `ui-` plus the first 32 hexadecimal characters of
 SHA-256(`ui.privatellms.msp/slug/v1:` + MSP object UID). This is a 128-bit suffix,
-not a mathematical guarantee against collisions. It does not expose the UID used
-by the existing Open WebUI signing-key derivation. The signing-key design itself
-and `WEBUI_AUTH=false` are unchanged: this patch does not implement account access
-control or complete the authentication part of showroom#792.
+not a mathematical guarantee against collisions. Session signing keys are generated
+independently from cryptographic randomness. The guarded WebUI requires organization
+OAuth login and the user's KCP `get` permission on the exact source ChatUIInstance;
+there is no separate chat role. Each instance needs an operator-reviewed source
+mapping, OIDC client credentials and valid ingress TLS as described in
+[access-policy.md](access-policy.md). Controlled-account login, denial, revocation
+and browser checks on the target environment remain rollout acceptance gates.
 
 ## Required operator configuration
 
-The manager requires `--hostname-policy-file`. It validates the file before
-starting any controller. The chart mounts a ConfigMap generated from
-`hostnamePolicy` values; only platform operators may manage this configuration.
+The manager requires both `--hostname-policy-file` and `--access-policy-file`.
+It validates both files before starting any controller. The chart mounts a
+ConfigMap generated from `hostnamePolicy` values; only platform operators may
+manage this configuration.
 There is no tenant-facing field for opting out or requesting a legacy name.
 
 ```yaml
@@ -108,6 +112,10 @@ part of the platform trust boundary. Inventory DNS and all routing kinds separat
    Coordinate this with the separate image-policy migration in
    [image-policy-upgrades.md](image-policy-upgrades.md); all prior gates still apply.
    Finish the required image-value cleanup before applying the combined schema.
+   Inventory and correct existing `spec.replicas > 1` values to `1` before tightening
+   the CRD and served KCP schema. This version supports one application replica;
+   `0` uses the default of one and is not a shutdown command. Do not assume stored
+   out-of-range values or their status updates remain valid after the schema change.
 4. Deploy one new manager with the reviewed map. The chart requires one replica,
    uses `Recreate`, and restarts on ConfigMap content changes. A different deployment
    of the old controller must also be stopped; the chart cannot enforce that.
