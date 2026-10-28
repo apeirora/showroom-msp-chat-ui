@@ -9,7 +9,7 @@ Deploy the Chat UI Operator using the [Open Component Model](https://ocm.softwar
 - Kubernetes cluster with:
   - [OCM Controller](https://github.com/open-component-model/open-component-model) installed
   - [Flux](https://fluxcd.io/) controllers (source-controller, helm-controller)
-- `kubectl`, `helm` 3.12+
+- `kubectl`, `helm` 3.12+, and `envsubst` for manual bootstrap
 - `GITHUB_TOKEN` with read access to GHCR packages
 - The [access-policy prerequisites](access-policy.md): verified HTTPS KCP/issuer
   endpoints, trusted ingress TLS, reviewed source-instance mappings, registered
@@ -80,6 +80,15 @@ platform delivery or scoped ESO SecretStores. No secret values belong in this fi
 Empty access entries permit manager startup but leave all instances inaccessible;
 add reviewed MSP and KCP source UID mappings before browser acceptance.
 
+Arrange TLS certificate delivery through the platform's existing certificate
+management before enabling instances. Each managed Ingress lives in its
+ChatUIInstance's **runtime namespace**, so the configured TLS Secret name must
+exist in every such namespace. A Secret only in the operator's `chat-ui` namespace
+does not satisfy this requirement. Verify the delivered Secret has type
+`kubernetes.io/tls`, a current trusted certificate covering the owned hostnames,
+and managed renewal. Keep private keys out of values files and terminal output.
+This is separate from OIDC client-secret delivery in the credential namespace.
+
 ```yaml
 component:
   semver: "0.14.3" # Hold; replace with the exact reviewed release when migration is ready.
@@ -119,7 +128,7 @@ operator:
 | `operator.targetNamespace` | Namespace where the operator is deployed | `chat-ui` |
 | `operator.publicHost` | Public hostname for Chat UI | `chat.localhost` |
 | `operator.publicScheme` | `http` or `https` | `https` |
-| `operator.tlsSecretName` | TLS secret for ingress | `""` |
+| `operator.tlsSecretName` | Required TLS Secret name delivered in every instance/runtime namespace | `""` |
 | `operator.imagePullSecretName` | Image pull secret name | `ghcr-credentials` |
 | `operator.imageRepository` | Operator image repository | `ghcr.io/apeirora/chat-ui-controller` |
 | `operator.imageTag` | Operator image tag | `""` (uses chart default) |
@@ -181,23 +190,32 @@ The OCM controller detects the version change, resolves the new chart, and the `
 
 ## Manual Deployment via bootstrap.yaml
 
-For quick testing without Helm, use `ocm/bootstrap.yaml` with `envsubst`:
+Before using `ocm/bootstrap.yaml`, complete the hostname/access inventory and
+the runtime-namespace TLS delivery described above. Set `CHAT_UI_TLS_SECRET_NAME`
+to the delivered Secret name. The bootstrap references it; it does not issue or
+copy certificates. An empty value is not supported by this installation path.
+
+Render locally with the required-input checks and the explicit substitution list:
 
 ```sh
-export GH_OWNER=apeirora
-# Set VERSION to the exact reviewed release and HOSTNAME_POLICY_CUTOVER to the fixed inventory timestamp.
-: "${VERSION:?Set an exact reviewed release}"
-: "${HOSTNAME_POLICY_CUTOVER:?Set the reviewed fixed cutoff}"
-: "${CHAT_UI_KCP_SERVER:?Set the verified HTTPS KCP origin without a path}"
-: "${CHAT_UI_CONTROLLER_IMAGE_DIGEST:?Set the released controller image reference including @sha256 digest}"
-export VERSION HOSTNAME_POLICY_CUTOVER CHAT_UI_KCP_SERVER CHAT_UI_CONTROLLER_IMAGE_DIGEST
+(
+  set -eu
+  export GH_OWNER=apeirora
+  # Set VERSION to the exact reviewed release and use the fixed inventory timestamp.
+  : "${VERSION:?Set an exact reviewed release}"
+  : "${HOSTNAME_POLICY_CUTOVER:?Set the reviewed fixed cutoff}"
+  : "${CHAT_UI_KCP_SERVER:?Set the verified HTTPS KCP origin without a path}"
+  : "${CHAT_UI_CONTROLLER_IMAGE_DIGEST:?Set the released controller image reference including @sha256 digest}"
+  : "${CHAT_UI_TLS_SECRET_NAME:?Set the TLS Secret name delivered in every runtime namespace}"
+  export VERSION HOSTNAME_POLICY_CUTOVER CHAT_UI_KCP_SERVER CHAT_UI_CONTROLLER_IMAGE_DIGEST CHAT_UI_TLS_SECRET_NAME
 
-envsubst '${GH_OWNER} ${VERSION} ${HOSTNAME_POLICY_CUTOVER} ${CHAT_UI_KCP_SERVER} ${CHAT_UI_CONTROLLER_IMAGE_DIGEST}' \
-  < "ocm/bootstrap.yaml" | kubectl apply -f -
+  envsubst '${GH_OWNER} ${VERSION} ${HOSTNAME_POLICY_CUTOVER} ${CHAT_UI_KCP_SERVER} ${CHAT_UI_CONTROLLER_IMAGE_DIGEST} ${CHAT_UI_TLS_SECRET_NAME}' \
+    < "ocm/bootstrap.yaml" > "bootstrap-rendered.yaml"
+)
 ```
 
-This creates the same three resources (`ComponentVersion`, `Resource`, `FluxDeployer`).
-Before applying, edit the `FluxDeployer`'s `.spec.helmReleaseTemplate.values.hostnamePolicy.entries`
+After a successful render, review `bootstrap-rendered.yaml`. Edit the
+`FluxDeployer`'s `.spec.helmReleaseTemplate.values.hostnamePolicy.entries`
 to include every reviewed legacy mapping, and customize the operator settings.
 Also fill `values.accessPolicy.entries` with reviewed identities and client-secret
 references and arrange credential delivery. The bootstrap uses `chat-ui` as its
@@ -206,25 +224,36 @@ that operator-owned setting before applying if the target uses a different scope
 An empty hostname entries list is only sufficient for a fresh install with no legacy
 objects; empty access entries never grant browser access.
 
+Apply the reviewed file to the intended cluster only after those prerequisites
+are verified:
+
+```sh
+kubectl apply -f "bootstrap-rendered.yaml"
+```
+
+This creates the same three resources (`ComponentVersion`, `Resource`, `FluxDeployer`).
+Local rendering does not verify certificate delivery or the served HTTPS endpoint.
+
 ## Component Structure
 
-The OCM component bundles the Helm chart and the controller image:
+The OCM component bundles the Helm chart and the controller image. This schematic
+uses the same exact reviewed `$VERSION` selected for installation:
 
 ```yaml
 name: ui.privatellms.msp/chat-ui
-version: 0.8.0
+version: "${VERSION}"
 resources:
   - name: oci-helm-chart-chat-ui-operator
     type: helmChart
     access:
       type: ociArtifact
-      imageReference: ghcr.io/apeirora/charts/chat-ui-operator:0.8.0
+      imageReference: ghcr.io/apeirora/charts/chat-ui-operator:${VERSION}
 
   - name: chat-ui-image
     type: ociImage
     access:
       type: ociArtifact
-      imageReference: ghcr.io/apeirora/chat-ui-controller:0.8.0
+      imageReference: ghcr.io/apeirora/chat-ui-controller:${VERSION}
 ```
 
 ### Inspect the Component
@@ -233,8 +262,9 @@ resources:
 # List available versions
 ocm get componentversions oci://ghcr.io/apeirora/ocm//ui.privatellms.msp/chat-ui
 
-# Show component details
-ocm get resources oci://ghcr.io/apeirora/ocm//ui.privatellms.msp/chat-ui:0.8.0
+# Show the exact reviewed component selected for installation.
+: "${VERSION:?Set an exact reviewed release}"
+ocm get resources "oci://ghcr.io/apeirora/ocm//ui.privatellms.msp/chat-ui:${VERSION}"
 ```
 
 ## Deploying Without OCM

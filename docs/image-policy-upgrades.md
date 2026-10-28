@@ -18,18 +18,24 @@ guaranteed, so mirror it if deployment availability requires retained artifacts.
 
 ## Existing installations
 
-1. Inventory `spec.image` in **both** the tenant KCP objects and their MSP copies.
-   Record the running pod image digests and deployment ownership. Do not include
-   Secret values. Explicit tags/custom images become unsupported.
+1. Inventory `spec.image` and `spec.replicas` in **both** the tenant KCP objects
+   and their MSP copies, including terminating objects. Record the running pod
+   image digests and deployment ownership. Do not include Secret values.
+   Explicit tags/custom images and replica counts greater than `1` become unsupported.
 2. Before installing the stricter schema, clear explicit image values in KCP and
    allow the sync agent to propagate the change. This includes old explicit pins
-   when a future release changes the supported digest. Verify the MSP copies.
+   when a future release changes the supported digest. Set legacy `spec.replicas > 1`
+   values to `1` in KCP and verify propagation to the MSP copies before tightening
+   either schema. This release supports one application pod; `0` uses the default
+   of one and is not a shutdown command.
    A stricter schema can reject ordinary updates and finalizer removal on stored
    invalid objects; do not depend on validation ratcheting in Kubernetes or KCP.
 3. Deploy the reviewed controller in the intended development environment. It
    enforces the policy even with the old schema. Unsupported requests receive
    `ImageNotAllowed`; their owned Deployment is scaled to zero. Deletion still
    follows the ordinary finalizer path under the old schema.
+   Stored replica counts greater than `1` receive `UnsupportedReplicas`; the owned
+   Ingress is withdrawn and the owned workload stopped until the spec is corrected.
 4. For a supported request with an older Deployment image, the controller first
    scales that Deployment to zero and waits for its controller to observe the
    scale-down. It then sets the pinned image and restores requested replicas.
@@ -42,8 +48,9 @@ guaranteed, so mirror it if deployment availability requires retained artifacts.
 5. Once no invalid stored values remain, apply the reviewed CRD upgrade through its
    owning deployment system. Helm's `crds/` directory alone does not upgrade an
    existing CRD. Check the Flux HelmRelease CRD policy and the actual served schema;
-   do not assume a chart version bump applied the enum. Then check the sync agent's
-   KCP APIResourceSchema and APIExport propagation. The sync agent can propagate the
+   do not assume a chart version bump applied the image enum or replica maximum.
+   Then check the sync agent's KCP APIResourceSchema and APIExport propagation.
+   The sync agent can propagate the
    stricter schema automatically, so finish KCP cleanup before applying the MSP CRD.
    Regeneration also adds standard validation of status conditions (status enum,
    reason syntax and length limits); verify stored conditions before applying it.

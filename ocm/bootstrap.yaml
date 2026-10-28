@@ -55,7 +55,8 @@ spec:
       env:
         PUBLIC_HOST: chat-ui.example.com
         PUBLIC_SCHEME: https
-        TLS_SECRET_NAME: ""
+        # Platform delivery must create this Secret in each instance/runtime namespace.
+        TLS_SECRET_NAME: '${CHAT_UI_TLS_SECRET_NAME}'
       image:
         imagePullSecrets:
           - name: ghcr-credentials
