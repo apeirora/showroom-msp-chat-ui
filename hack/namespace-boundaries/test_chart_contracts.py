@@ -24,4 +24,5 @@ class ChartContracts(unittest.TestCase):
         # Authenticated access uses the owned HTTPS endpoint, not the former
         # unauthenticated local HTTP shortcut. Keep the source lookup contract.
         self.assertIn('published HTTPS URL', guide)
-        self.assertNotIn('Open <http://localhost:8080>', guide)
+        self.assertNotIn('kubectl --context msp port-forward', guide)
+        self.assertNotRegex(guide, r'http://(?:localhost|127\.0\.0\.1)(?::\d+)?')
