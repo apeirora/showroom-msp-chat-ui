@@ -6,7 +6,8 @@
       "bump-minor-pre-major": false,
       "bump-patch-for-minor-pre-major": false,
       "draft": false,
-      "prerelease": false,
+      "prerelease": true,
+      "release-as": "0.14.4-rc.1",
       "extra-files": [
         {
           "type": "yaml",
@@ -22,6 +23,11 @@
           "type": "yaml",
           "path": "charts/chat-ui-operator/values.yaml",
           "jsonpath": "$.image.tag"
+        },
+        {
+          "type": "yaml",
+          "path": "charts/chat-ui-operator-ocm/values.yaml",
+          "jsonpath": "$.component.semver"
         },
         {
           "type": "yaml",

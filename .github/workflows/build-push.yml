@@ -19,6 +19,7 @@ jobs:
       chart_registry: ${{ steps.meta.outputs.chart_registry }}
       ocm_repository: ${{ steps.meta.outputs.ocm_repository }}
       image_digest: ${{ steps.dig.outputs.digest }}
+      publish_latest: ${{ steps.vars.outputs.publish_latest }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -28,11 +29,9 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Derive version from tag
+      - name: Derive version and release channel from tag
         id: vars
-        run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        run: bash hack/release-image-tags.sh
 
       - name: Prepare metadata
         id: meta
@@ -64,9 +63,7 @@ jobs:
           push: true
           build-args: |
             VERSION=${{ steps.vars.outputs.version }}
-          tags: |
-            ${{ steps.meta.outputs.image }}:${{ steps.vars.outputs.version }}
-            ${{ steps.meta.outputs.image }}:latest
+          tags: ${{ steps.vars.outputs.image_tags }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -110,6 +107,7 @@ jobs:
           - chat-ui-pm-app
     env:
       VERSION: ${{ needs.publish-image.outputs.version }}
+      IMAGE: ${{ needs.publish-image.outputs.image }}
       CHART_REGISTRY: ${{ needs.publish-image.outputs.chart_registry }}
     steps:
       - name: Check out repository
@@ -131,6 +129,9 @@ jobs:
           out_dir="dist/${chart}"
           pkg="${chart}-${VERSION}.tgz"
           echo "::group::${chart}"
+          # Set both standalone and file:// dependency defaults before packaging.
+          python3 hack/set-release-image.py charts/chat-ui-operator/values.yaml "$VERSION" \
+            --repository "$IMAGE" --ocm-values charts/chat-ui-operator-ocm/values.yaml
           # Pull deps recursively for any sub-chart with its own deps. `helm
           # dep update` on the umbrella alone does not descend, so file:// sub
           # charts get packaged without their own transitive deps (e.g.
@@ -165,6 +166,7 @@ jobs:
       IMAGE: ${{ needs.publish-image.outputs.image }}
       CHART_REGISTRY: ${{ needs.publish-image.outputs.chart_registry }}
       OCM_REPOSITORY: ${{ needs.publish-image.outputs.ocm_repository }}
+      PUBLISH_LATEST: ${{ needs.publish-image.outputs.publish_latest }}
       HELM_CHARTS: "chat-ui-operator chat-ui-operator-ocm chat-ui-sync-agent chat-ui-pm-integration chat-ui-ui chat-ui-msp-app chat-ui-pm-app"
     steps:
       - name: Check out repository
@@ -206,7 +208,7 @@ jobs:
             "image": {
               "name": "${IMAGE}",
               "tag": "${VERSION}",
-              "latest": true
+              "latest": ${PUBLISH_LATEST}
             },
             "charts": ${charts_json}
           }
@@ -237,6 +239,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
+          prerelease: ${{ needs.publish-image.outputs.publish_latest != 'true' }}
+          make_latest: ${{ needs.publish-image.outputs.publish_latest }}
           files: |
             dist/charts/*.tgz
             SHA256SUMS.txt
