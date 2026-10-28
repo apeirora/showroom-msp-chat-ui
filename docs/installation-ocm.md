@@ -65,12 +65,17 @@ kubectl -n chat-ui create secret docker-registry ghcr-credentials \
 
 Create a `values.yaml` override file:
 
-Pin existing installations to their current exact version until the
-[hostname migration](hostname-policy.md) is prepared. The wrapper's `0.14.3`
-default is a hold on the previous release, not a fixed version of this finding.
-After inventory and schema upgrade, select the exact reviewed release containing
-the fix and provide its policy. Fresh installs also need a fixed API-server cutoff
-before creating instances; they may use an empty entries list.
+The wrapper's component pin follows the selected release. The example below
+opts into `0.14.4-rc.1` only for development after the artifact checks and migration
+prerequisites in [development-release.md](development-release.md). Do not apply
+this RC to production. Existing installations should retain their current exact
+stable pin, such as `0.14.3`, until their reviewed migration is ready; that hold
+does not apply the security fixes.
+
+Complete the [hostname migration](hostname-policy.md), inventory and schema
+upgrade before activating the selected release and its policy. Fresh installs
+also need a fixed API-server cutoff before creating instances; they may use an
+empty entries list.
 Also prepare `operator.accessPolicy` below. Use the controller/access-proxy image
 digest from that exact reviewed release, not the OAuth2 Proxy image. Provision
 its credential namespace separately from every instance namespace. The platform
@@ -91,7 +96,7 @@ This is separate from OIDC client-secret delivery in the credential namespace.
 
 ```yaml
 component:
-  semver: "0.14.3" # Hold; replace with the exact reviewed release when migration is ready.
+  semver: "0.14.4-rc.1" # Development opt-in after the artifact and migration checks above.
 
 operator:
   hostnamePolicy:
@@ -116,6 +121,10 @@ operator:
 
 ### All Values
 
+These are the source-checkout defaults. Release packaging sets the installer's
+`operator.imageRepository` and `operator.imageTag` to the published image and
+version; any overrides must match the selected component release.
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `component.name` | Name for the OCM resources | `chat-ui` |
@@ -123,7 +132,7 @@ operator:
 | `component.componentName` | OCM component identity | `ui.privatellms.msp/chat-ui` |
 | `component.repositoryUrl` | OCI registry URL | `ghcr.io/apeirora/ocm` |
 | `component.secretRefName` | Secret with registry credentials | `ghcr-credentials` |
-| `component.semver` | Exact reviewed component version | `0.14.3` (migration hold) |
+| `component.semver` | Exact reviewed component version | Published release version, set by Release Please |
 | `component.interval` | Reconciliation interval | `1m` |
 | `operator.targetNamespace` | Namespace where the operator is deployed | `chat-ui` |
 | `operator.publicHost` | Public hostname for Chat UI | `chat.localhost` |
@@ -131,7 +140,7 @@ operator:
 | `operator.tlsSecretName` | Required TLS Secret name delivered in every instance/runtime namespace | `""` |
 | `operator.imagePullSecretName` | Image pull secret name | `ghcr-credentials` |
 | `operator.imageRepository` | Operator image repository | `ghcr.io/apeirora/chat-ui-controller` |
-| `operator.imageTag` | Operator image tag | `""` (uses chart default) |
+| `operator.imageTag` | Operator image tag | `""` in source (uses chart default); release version in published packages |
 | `operator.ingressExtraAnnotations` | Extra ingress annotations | `{}` |
 | `operator.hostnamePolicy` | Required fixed cutoff and legacy mappings | Empty cutoff; refuses startup |
 | `operator.accessPolicy` | Required KCP origin, credential namespace, pinned proxy image and mappings | Empty required fields; refuses startup |

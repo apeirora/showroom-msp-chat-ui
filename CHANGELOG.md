@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.14.4-rc.1](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.3...v0.14.4-rc.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* Enforce Chat UI image, hostname and instance access policies ([#139](https://github.com/apeirora/showroom-msp-chat-ui/issues/139)) ([d3c1929](https://github.com/apeirora/showroom-msp-chat-ui/commit/d3c192926f5121248bc435a1e47023a11d33ca4d))
+* **release:** Prepare Chat UI development prereleases ([#141](https://github.com/apeirora/showroom-msp-chat-ui/issues/141)) ([0d650c1](https://github.com/apeirora/showroom-msp-chat-ui/commit/0d650c1afb14fe0f1769d2e1b36ee0ffeea9ef02))
+
 ## [0.14.3](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.2...v0.14.3) (2026-10-15)
 
 
