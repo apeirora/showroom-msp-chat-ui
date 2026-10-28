@@ -67,7 +67,7 @@ kind: ChatUIInstance
 |-------|------|----------|---------|-------------|
 | `spec.credentialsSecretRef.name` | `string` | Yes | -- | Secret in the same namespace with `OPENAI_API_URL` and `OPENAI_API_KEY` |
 | `spec.replicas` | `int32` | No | `1` | Number of Open WebUI pods (minimum 1) |
-| `spec.image` | `string` | No | `ghcr.io/open-webui/open-webui:latest` | Override the Open WebUI container image |
+| `spec.image` | `string` | No | Release-pinned digest | Omit, or use the exact [supported image](user-guide.md#supported-image) |
 
 ### Status Fields
 
@@ -75,6 +75,8 @@ kind: ChatUIInstance
 |-------|------|-------------|
 | `status.phase` | `string` | `Provisioning`, `Ready`, or `Error` |
 | `status.url` | `string` | Public URL (`<scheme>://<slug>.<PUBLIC_HOST>`) |
+| `status.slug` | `string` | Operator-selected name; never an ownership input |
+| `status.slugSource` | `string` | `Derived` or `Legacy` |
 | `status.observedGeneration` | `int64` | Last generation processed by the controller |
 | `status.conditions` | `[]Condition` | Standard Kubernetes conditions (type: `Ready`) |
 
@@ -91,13 +93,15 @@ my-chat  my-llm-creds     Ready   https://abc123.chat.example.com
 flowchart TD
     A[Watch ChatUIInstance] --> B{Deleted?}
     B -->|Yes| C[Remove finalizer]
-    B -->|No| D[Ensure finalizer]
+    B -->|No| V[Enforce image policy, select hostname and check ownership]
+    V -->|Allowed| D[Ensure finalizer]
+    V -->|Denied| X[Ready=False; stop reconciliation]
     D --> E{Secret ref valid?}
     E -->|No| F["Phase=Error<br/>Ready=False (MissingSecret)"]
     E -->|Yes| G[Fetch Secret + compute checksum]
     G --> H{Secret exists?}
     H -->|No| I["Phase=Error<br/>Ready=False (SecretNotFound)"]
-    H -->|Yes| J[Ensure slug annotation]
+    H -->|Yes| J[Use operator-selected hostname]
     J --> K[Reconcile Deployment]
     K --> L[Reconcile Service]
     L --> M[Reconcile Ingress]
@@ -114,7 +118,11 @@ flowchart TD
 
 ### Key Behaviors
 
-**Slug generation.** Each instance gets a random 12-character slug stored as the annotation `ui.privatellms.msp/slug`. This slug is stable across reconciliations and forms the subdomain: `<slug>.<PUBLIC_HOST>`.
+**Hostname ownership.** A required operator policy selects hashed-UID names for
+new instances and explicit reviewed names for legacy instances. Tenant metadata
+is ignored. Uncached Ingress ownership/conflict checks protect reconciliation;
+shared routing writers need a separate admission/claim boundary. See
+[hostname migration](hostname-policy.md) for limits and the required cutover.
 
 **Secret checksum.** The controller computes a SHA256 checksum of the referenced Secret's data and stores it as a pod template annotation. When the Secret changes, the checksum changes, triggering a rolling update.
 

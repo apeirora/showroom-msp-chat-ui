@@ -4,11 +4,26 @@ component:
   componentName: ui.privatellms.msp/chat-ui
   repositoryUrl: ghcr.io/apeirora/ocm
   secretRefName: ghcr-credentials
-  semver: ">=0.8.0"
+  # Keep an exact reviewed version until hostname-policy migration is prepared.
+  # Existing installations must also replace their own broad constraints.
+  semver: "0.14.3"
   interval: 1m
   # chartResourceName: oci-helm-chart-chat-ui-operator
 
 operator:
+  # Required for the new manager; see docs/hostname-policy.md.
+  # Required: reviewed source identities and the released access-proxy image digest.
+  # No credential values belong here. Client Secrets live in credentialsNamespace.
+  clientSecrets: [] # Optional scoped ESO delivery; see docs/access-policy.md.
+  accessPolicy:
+    kcpServer: ''
+    kcpCA: ''
+    credentialsNamespace: ''
+    proxyImage: ''
+    entries: []
+  hostnamePolicy:
+    cutover: ''
+    entries: []
   targetNamespace: chat-ui
   publicHost: chat.localhost
   publicScheme: https

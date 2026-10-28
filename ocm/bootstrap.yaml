@@ -42,10 +42,21 @@ spec:
     releaseName: chat-ui-operator
     targetNamespace: chat-ui
     values:
+      # Set before applying; use the reviewed stopped-controller inventory.
+      clientSecrets: [] # Optional existing scoped ESO SecretStore references.
+      accessPolicy:
+        kcpServer: '${CHAT_UI_KCP_SERVER}'
+        credentialsNamespace: chat-ui
+        proxyImage: '${CHAT_UI_CONTROLLER_IMAGE_DIGEST}'
+        entries: [] # Add reviewed source UID, issuer and client-secret references.
+      hostnamePolicy:
+        cutover: '${HOSTNAME_POLICY_CUTOVER}'
+        entries: [] # Add all reviewed legacy mappings for an existing installation.
       env:
         PUBLIC_HOST: chat-ui.example.com
         PUBLIC_SCHEME: https
-        TLS_SECRET_NAME: ""
+        # Platform delivery must create this Secret in each instance/runtime namespace.
+        TLS_SECRET_NAME: '${CHAT_UI_TLS_SECRET_NAME}'
       image:
         imagePullSecrets:
           - name: ghcr-credentials

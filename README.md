@@ -30,6 +30,10 @@ It is designed for the **ApeiroRA Showroom** -- a demo and experimentation envir
 
 ## Key Features
 
+Upgrades require an operator-owned [hostname policy](docs/hostname-policy.md)
+and a stopped-controller inventory. Tenant slug annotations are ignored. This
+hostname protection does not add user authentication.
+
 - **One CR = One Chat UI** -- Each `ChatUIInstance` gets its own Open WebUI deployment with a stable, unique URL
 - **Credential wiring** -- Reads `OPENAI_API_URL` and `OPENAI_API_KEY` from a referenced Secret; auto-rolls pods on Secret changes
 - **Readiness gating** -- Reports `status.phase=Ready` only after Deployment, Service endpoints, HTTP health checks, and DNS resolution all pass
@@ -153,6 +157,10 @@ This repository ships four Helm charts:
 |-------|-------------|
 | `ghcr.io/apeirora/chat-ui-controller` | Operator controller binary (distroless) |
 
+The managed Open WebUI workload uses a fixed multi-platform digest. Tenants cannot
+choose arbitrary images. See [supported images](docs/user-guide.md#supported-image)
+and the [image-policy upgrade procedure](docs/image-policy-upgrades.md).
+
 ## Project Structure
 
 ```
@@ -216,3 +224,5 @@ The release configuration keeps `prerelease: false`.
 When the previous version has an `rc` suffix, use a `Release-As` commit footer to select the next stable version.
 For the namespace configuration release, select `Release-As: 0.14.0`.
 Check the release manifest, chart versions, and controller image tag before merging the release PR.
+
+Authenticated instances also require the operator-reviewed [access policy](docs/access-policy.md), dedicated organization OIDC clients and credential delivery. This development migration resets application data and requires controlled-account acceptance before closure.

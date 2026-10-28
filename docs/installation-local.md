@@ -8,6 +8,9 @@ Install the Chat UI provider on a local [Platform Mesh](https://github.com/platf
 - [kubectl-kcp plugin](https://github.com/kcp-dev/kcp/releases) — provides `kubectl kcp workspace`
 - [Helm](https://helm.sh/) 3.14+
 - An OpenAI-compatible endpoint to point Chat UI at. The Platform Mesh tutorial installs [Private LLM](https://github.com/apeirora/showroom-msp-private-llm/blob/main/docs/installation-local.md) first; alternatively, supply your own endpoint via a Secret (see [Create a ChatUIInstance](#create-a-chatuiinstance-consumer-side)).
+- Verified HTTPS access from the application pods to KCP and the organization
+  issuer, an ingress hostname with trusted TLS, and an OIDC client whose audience
+  KCP accepts. Local HTTP port-forwarding does not satisfy the access policy.
 
 Export the admin kubeconfig path (only needed once per shell):
 
@@ -41,10 +44,42 @@ helm dependency update charts/chat-ui-pm-app
 
 ### 3. Install the MSP-side umbrella (Kind cluster)
 
+Create `chat-ui-policy-values.yaml` with both policies nested under the operator:
+
+```yaml
+chat-ui-operator:
+  hostnamePolicy:
+    cutover: '' # Replace with a fixed API-server timestamp before creating instances.
+    entries: []
+  accessPolicy:
+    kcpServer: https://kcp.example.test # Actual verified HTTPS origin, with no path.
+    kcpCA: '' # Optional PEM CA for KCP; otherwise use system trust.
+    credentialsNamespace: chat-ui-credentials
+    proxyImage: ghcr.io/apeirora/chat-ui-controller@sha256:<reviewed-controller-image-digest>
+    entries: [] # Add exact reviewed MSP/source identities and OIDC references.
+  clientSecrets: [] # Optional delivery through existing scoped ESO SecretStores.
+  env:
+    PUBLIC_HOST: chat-ui.example.test # Reachable owned suffix with trusted TLS.
+    PUBLIC_SCHEME: https
+    TLS_SECRET_NAME: chat-ui-tls
+```
+
+An empty cutoff refuses manager startup. Reuse the same cutoff on upgrades; if
+instances already exist, follow the [hostname migration](hostname-policy.md)
+to inventory mappings, stop the old controller and apply the CRD first.
+Replace the KCP origin, host and controller image digest with the reviewed target
+values. Prepare the credential namespace separately from all instance namespaces,
+then have the platform owner register OIDC clients with exact owned-host callback
+URIs and deliver their `client_secret` Secrets there. Existing platform delivery
+or the scoped ESO `clientSecrets` integration can supply them; no secret values
+belong in this file. See [access-policy.md](access-policy.md) for the mapping and
+delivery schema. Empty access entries permit startup but grant no instance access.
+
 ```sh
 helm install chat-ui charts/chat-ui-msp-app \
   --namespace chat-ui --create-namespace \
-  --set-file kcpKubeconfig.adminContent=$KCP
+  -f "chat-ui-policy-values.yaml" \
+  --set-file "kcpKubeconfig.adminContent=$KCP"
 ```
 
 Creates the operator, sync agent, and a `pm-kcp-kubeconfig` Secret generated from the admin kubeconfig rewritten to target `root:providers:chat-ui` via KCP's in-cluster front-proxy.
@@ -123,13 +158,20 @@ kubectl get chatuiinstances -w
 
 ## Access the Chat UI
 
-```sh
-# Use the MSP kubeconfig. Find the source namespace stored by api-syncagent.
-CHAT_NS=$(kubectl --context msp get chatuiinstances -A -o json | jq -r '.items[] | select(.metadata.annotations["syncagent.kcp.io/remote-object-namespace"] == "default" and .metadata.annotations["syncagent.kcp.io/remote-object-name"] == "demo-chat") | .metadata.namespace')
-kubectl --context msp port-forward -n "$CHAT_NS" svc/demo-chat-chatui 8080:8080
-```
+The sync agent's `syncagent.kcp.io/remote-object-namespace` and
+`syncagent.kcp.io/remote-object-name` annotations help locate candidate runtime
+objects. Treat them as lookup hints; verify the workspace and both object UIDs
+through trusted API access before approving a mapping.
 
-Open <http://localhost:8080>.
+After the source and MSP objects exist, read both identities through trusted access
+and add their exact UIDs, namespaces and names to the reviewed access policy. Do not
+infer authorization mappings from tenant annotations. Apply the policy update,
+register the selected `https://<owned-host>/oauth2/callback` URI and verify the client
+Secret is delivered. Confirm the Ingress hostname resolves and presents trusted TLS.
+
+Open the instance's published HTTPS URL once `Ready=True`, then sign in with an
+organization identity allowed to `get` that exact source ChatUIInstance. The
+guarded service does not provide an unauthenticated HTTP port-forward fallback.
 
 ## Cleanup
 
@@ -143,7 +185,10 @@ helm uninstall chat-ui-pm -n chat-ui
 
 ### ChatUIInstance stays in `Provisioning`
 
-The readiness check requires DNS resolution of the Ingress hostname, which won't work locally without an Ingress controller. The Open WebUI pod is still running — use `kubectl port-forward` to access it.
+Check the instance conditions, reviewed hostname/access mappings, delivered client
+Secret and backend Secret first. Missing access configuration withdraws the owned
+Ingress and stops the workload. Ready also requires a working Ingress hostname and
+trusted TLS; configure these locally before browser acceptance.
 
 ### Sync-agent can't reach KCP
 
@@ -152,3 +197,15 @@ See the equivalent troubleshooting section in the [Private LLM local install gui
 ## Development Mode
 
 For iterating on controller code, see [development.md](./development.md).
+
+Prepare separate JSON files containing the `hostnamePolicy` and `accessPolicy`
+objects themselves (without their YAML wrapper keys), then run:
+
+```sh
+make run \
+  HOSTNAME_POLICY_FILE="/path/to/reviewed/hostname-policy.json" \
+  ACCESS_POLICY_FILE="/path/to/reviewed/access-policy.json"
+```
+
+Both paths are required. The same policy validation and credential-delivery
+requirements apply when the controller runs on the host.

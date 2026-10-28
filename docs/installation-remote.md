@@ -17,13 +17,21 @@ The simplest path for standalone deployment.
 
 ### Install
 
+Prepare `hostname-policy-values.yaml` as in the [Helm guide](installation-helm.md).
+The required fixed cutoff and legacy map follow the [coordinated migration](hostname-policy.md),
+including stopping the previous controller and upgrading the CRD before startup.
+For a fresh install use a fixed server timestamp before creating instances, with
+empty entries. Set `VERSION` to the exact reviewed release; do not auto-upgrade a
+running installation to this change before its policy and schema are ready.
+
 ```bash
 helm upgrade --install chat-ui-operator \
   oci://ghcr.io/apeirora/charts/chat-ui-operator \
   --namespace chat-ui --create-namespace \
-  --version 0.8.0 \
+  --version "$VERSION" \
+  -f hostname-policy-values.yaml \
   --set image.repository=ghcr.io/apeirora/chat-ui-controller \
-  --set image.tag=0.8.0 \
+  --set image.tag="$VERSION" \
   --set env.PUBLIC_HOST="chat-ui.example.com" \
   --set env.PUBLIC_SCHEME=https \
   --set env.TLS_SECRET_NAME="chat-ui-wildcard-tls"
@@ -84,7 +92,7 @@ spec:
   chart:
     spec:
       chart: chat-ui-operator
-      version: ">=0.8.0 <1.0.0"
+      version: "0.14.3" # Migration hold; select the exact fixed release after policy/schema preparation.
       sourceRef:
         kind: HelmRepository
         name: helm-showroom-repository
@@ -116,7 +124,13 @@ spec:
 
 **Example** (`overlays/dev/operator-values.yaml`):
 
+Supply the reviewed policy here and pin the HelmRelease version until migration
+is ready. The empty placeholder below deliberately refuses manager startup.
+
 ```yaml
+hostnamePolicy:
+  cutover: '' # Replace with the fixed reviewed API-server timestamp.
+  entries: [] # Add legacy mappings for an existing installation.
 image:
   repository: ghcr.io/apeirora/chat-ui-controller
   pullPolicy: Always

@@ -1,3 +1,6 @@
+{{- if ne (toString .Values.manager.replicas) "1" }}
+{{- fail "hostname migration requires manager.replicas=1 and no other active controller" }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -6,12 +9,18 @@ metadata:
     app.kubernetes.io/name: chat-ui-operator
 spec:
   replicas: {{ .Values.manager.replicas }}
+  strategy:
+    type: Recreate
+    rollingUpdate: null
   selector:
     matchLabels:
       control-plane: controller-manager
       app.kubernetes.io/name: chat-ui-operator
   template:
     metadata:
+      annotations:
+        checksum/access-policy: {{ include (print $.Template.BasePath "/access-policy.yaml") . | sha256sum }}
+        checksum/hostname-policy: {{ include (print $.Template.BasePath "/hostname-policy.yaml") . | sha256sum }}
       labels:
         control-plane: controller-manager
         app.kubernetes.io/name: chat-ui-operator
@@ -26,6 +35,15 @@ spec:
           args:
             - "--metrics-bind-address=:8080"
             - "--health-probe-bind-address=:8081"
+            - "--access-policy-file=/etc/chat-ui-access/policy.json"
+            - "--hostname-policy-file=/etc/chat-ui-hostnames/policy.json"
+          volumeMounts:
+            - name: access-policy
+              mountPath: /etc/chat-ui-access
+              readOnly: true
+            - name: hostname-policy
+              mountPath: /etc/chat-ui-hostnames
+              readOnly: true
           env:
             - name: PUBLIC_HOST
               value: {{ .Values.env.PUBLIC_HOST | quote }}
@@ -54,6 +72,13 @@ spec:
               port: 8081
           resources:
             {{- toYaml .Values.manager.resources | nindent 12 }}
+      volumes:
+        - name: access-policy
+          configMap:
+            name: {{ include "chatui.fullname" . }}-access-policy
+        - name: hostname-policy
+          configMap:
+            name: {{ include "chatui.fullname" . }}-hostname-policy
       {{- with .Values.image.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}

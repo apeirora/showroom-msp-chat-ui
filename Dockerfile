@@ -16,6 +16,11 @@ RUN go mod download
 COPY cmd/main.go cmd/main.go
 COPY api/ api/
 COPY internal/controller/ internal/controller/
+COPY internal/hostnamepolicy/ internal/hostnamepolicy/
+COPY internal/accesspolicy/ internal/accesspolicy/
+COPY internal/accessgate/ internal/accessgate/
+COPY internal/webuiguard/ internal/webuiguard/
+COPY cmd/access-proxy/ cmd/access-proxy/
 
 # Build
 # the GOARCH has not a default value to allow the binary be built according to the host where the command
@@ -23,12 +28,14 @@ COPY internal/controller/ internal/controller/
 # the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -ldflags "-X main.version=${VERSION}" -o manager cmd/main.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -o access-proxy ./cmd/access-proxy
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot@sha256:e8a4044e0b4ae4257efa45fc026c0bc30ad320d43bd4c1a7d5271bd241e386d0
 WORKDIR /
 COPY --from=builder /workspace/manager .
+COPY --from=builder /workspace/access-proxy .
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]

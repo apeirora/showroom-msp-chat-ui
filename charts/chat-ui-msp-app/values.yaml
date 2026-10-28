@@ -1,5 +1,5 @@
 publicHost: localhost
-publicScheme: http
+publicScheme: https
 
 # KCP sync-agent kubeconfig. See private-llm-msp-app/values.yaml for the full
 # schema — the two umbrellas share the same design.
@@ -17,9 +17,22 @@ imagePullSecret:
 
 # Passed through to the operator sub-chart.
 chat-ui-operator:
+  # Required before installation/upgrade; see docs/hostname-policy.md.
+  # Required: reviewed source identities and the released access-proxy image digest.
+  # No credential values belong here. Client Secrets live in credentialsNamespace.
+  clientSecrets: [] # Optional scoped ESO delivery; see docs/access-policy.md.
+  accessPolicy:
+    kcpServer: ''
+    kcpCA: ''
+    credentialsNamespace: ''
+    proxyImage: ''
+    entries: []
+  hostnamePolicy:
+    cutover: ''
+    entries: []
   env:
     PUBLIC_HOST: localhost
-    PUBLIC_SCHEME: http
+    PUBLIC_SCHEME: https
 
 # Passed through to the sync agent sub-chart. Values duplicated under the alias
 # and chart-name paths — see private-llm-msp-app/values.yaml for rationale.

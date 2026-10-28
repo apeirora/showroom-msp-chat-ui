@@ -21,4 +21,8 @@ class ChartContracts(unittest.TestCase):
         self.assertIn('name: "$TOKEN_SECRET"', guide)
         self.assertIn('syncagent.kcp.io/remote-object-namespace', guide)
         self.assertIn('syncagent.kcp.io/remote-object-name', guide)
-        self.assertIn('kubectl --context msp port-forward', guide)
+        # Authenticated access uses the owned HTTPS endpoint, not the former
+        # unauthenticated local HTTP shortcut. Keep the source lookup contract.
+        self.assertIn('published HTTPS URL', guide)
+        self.assertNotIn('kubectl --context msp port-forward', guide)
+        self.assertNotRegex(guide, r'http://(?:localhost|127\.0\.0\.1)(?::\d+)?')

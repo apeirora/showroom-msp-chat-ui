@@ -94,7 +94,14 @@ The URL follows the pattern:
 
 For example: `https://abc123def456.chat-ui.msp01.dev.showroom.apeirora.eu`
 
-The `<slug>` is a stable 12-character random string assigned on first reconciliation.
+The operator assigns the `<slug>` from immutable instance identity, or preserves
+an explicitly reviewed existing address. Tenant slug annotations are ignored.
+`status.slug` and `status.slugSource` report the selection; they cannot override it.
+An unresolved legacy mapping or conflicting route leaves the instance not ready.
+An already existing route may still serve traffic and needs operator review.
+Consumers must require `Ready=True` for the current generation as well as the slug.
+See [hostname ownership and migration](hostname-policy.md). Access authentication
+is a separate requirement; a unique URL does not restrict who may use the UI.
 
 ## Scaling
 
@@ -120,16 +127,19 @@ The operator will update the Deployment's environment variables and trigger a ro
 
 If the Secret **contents** change (e.g., rotated API key), the operator detects the checksum change and automatically rolls the pods -- no manual intervention needed.
 
-## Custom Image
+## Supported Image
 
-Override the Open WebUI image:
+Omit `spec.image` to follow the image pinned by the operator release. Custom images,
+mutable tags, whitespace and alternate digests are rejected. An explicit match to
+`api/v1alpha1.SupportedImage` remains accepted for compatibility, but do not set it:
+that explicit pin must be cleared before a later operator image upgrade.
 
-```yaml
-spec:
-  image: ghcr.io/open-webui/open-webui:v0.5.0
-```
-
-If omitted, the default is `ghcr.io/open-webui/open-webui:latest`.
+The API schema rejects unsupported images. The controller also enforces the policy
+for stored objects and installations whose schema has not yet been upgraded.
+A rejected image sets `Ready=False`, reason `ImageNotAllowed`, and `phase=Error`;
+any existing owned Deployment is scaled to zero. Clear `spec.image` to recover.
+Image upgrades interrupt service and discard container-local chat history, uploads,
+settings and sessions. See [the migration procedure](image-policy-upgrades.md).
 
 ## Open WebUI Configuration
 
@@ -156,6 +166,7 @@ Common reasons:
 
 | Reason | Meaning | Fix |
 |--------|---------|-----|
+| `ImageMigration` | Previous image is being scaled down before pinning | Wait for scale-down; check pod termination if stuck |
 | `DeploymentProgressing` | Pods are still rolling out | Wait, or check pod events |
 | `DeploymentNotReady` | Pods are not passing readiness probes | Check pod logs |
 | `ServiceEndpointsMissing` | No ready endpoints on port 8080 | Check pod health |
@@ -170,6 +181,8 @@ kubectl get chatuiinstance my-chat -o jsonpath='{.status.conditions}' | jq
 
 | Reason | Fix |
 |--------|-----|
+| `ImageNotAllowed` | Clear `spec.image` to use the supported release pin |
+| `ImagePolicyError` | Ask the operator to resolve a same-named Deployment owned by another instance |
 | `MissingSecret` | Set `spec.credentialsSecretRef.name` to a valid Secret name |
 | `SecretNotFound` | Create the Secret in the same namespace as the ChatUIInstance |
 
