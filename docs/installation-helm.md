@@ -33,6 +33,12 @@ existing install, complete the stopped-controller inventory and CRD upgrade firs
 The manager refuses to start with an empty policy. `VERSION` below must be the
 exact reviewed release containing this change; older releases do not enforce it.
 
+Set `VERSION=0.14.4-rc.1` only for an explicit development prerelease upgrade after the
+artifact checks and migration prerequisites in
+[development-release.md](development-release.md). Keep production at its current
+reviewed stable pin, such as `0.14.3`; that hold does not apply the security fixes.
+Use the same exact `VERSION` for every chart in the installation.
+
 Also prepare `access-policy-values.yaml` using the schema in
 [access-policy.md](access-policy.md). Replace the endpoint and image digest below
 with reviewed values. `proxyImage` is the controller/access-proxy image from the
@@ -72,7 +78,7 @@ helm upgrade --install chat-ui-operator \
 | Value | Default | Description |
 |-------|---------|-------------|
 | `image.repository` | `ghcr.io/apeirora/chat-ui-controller` | Controller image |
-| `image.tag` | `0.14.3` | Source-chart default; use the reviewed release |
+| `image.tag` | Packaged chart release version | Use the exact reviewed release |
 | `image.pullPolicy` | `IfNotPresent` | Pull policy |
 | `image.imagePullSecrets` | `[]` | Image pull secrets |
 | `manager.replicas` | `1` | Controller replicas |
@@ -171,19 +177,22 @@ helm upgrade --install chat-ui-operator \
 helm upgrade --install chat-ui-sync-agent \
   oci://ghcr.io/apeirora/charts/chat-ui-sync-agent \
   --namespace chat-ui \
+  --version "$VERSION" \
   --set publishedResources.namespace=api-syncagent \
   --set syncAgentOperator.kcpKubeconfig=pm-kcp-kubeconfig
 
 # 3. PM Integration (applied to KCP provider workspace)
 helm upgrade --install chat-ui-pm-integration \
   oci://ghcr.io/apeirora/charts/chat-ui-pm-integration \
+  --version "$VERSION" \
   --set publicHost="chat-ui.example.com" \
   --set publicScheme=https
 
 # 4. Portal UI (on MSP cluster)
 helm upgrade --install chat-ui-ui \
   oci://ghcr.io/apeirora/charts/chat-ui-ui \
-  --namespace chat-ui
+  --namespace chat-ui \
+  --version "$VERSION"
 ```
 
 > **Note**: The sync agent chart depends on `chat-ui-pm-integration` being installed first (the APIExport must exist before the agent can connect to it).
