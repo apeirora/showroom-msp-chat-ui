@@ -217,12 +217,14 @@ The Chat UI agent then owns a separate physical credential replica.
 Keep this value unchanged after instances exist.
 Delete instances and their related replicas before a namespace change.
 
-### Stable releases
+### Release channels
 
-Use stable versions for the Showroom demo deployments.
-The release configuration keeps `prerelease: false`.
-When the previous version has an `rc` suffix, use a `Release-As` commit footer to select the next stable version.
-For the namespace configuration release, select `Release-As: 0.14.0`.
-Check the release manifest, chart versions, and controller image tag before merging the release PR.
+The current configuration prepares the development prerelease `0.14.4-rc.1` with
+`prerelease: true`. Follow [development-release.md](docs/development-release.md)
+for artifact verification and migration prerequisites. Leave production deployment
+configuration unchanged. A later stable release needs a separate reviewed
+configuration change; do not use a manual tag or an old `Release-As` footer.
+Check the release manifest, chart versions and controller image tag before
+merging the release PR.
 
 Authenticated instances also require the operator-reviewed [access policy](docs/access-policy.md), dedicated organization OIDC clients and credential delivery. This development migration resets application data and requires controlled-account acceptance before closure.
