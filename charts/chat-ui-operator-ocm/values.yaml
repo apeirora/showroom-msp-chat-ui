@@ -4,7 +4,7 @@ component:
   componentName: ui.privatellms.msp/chat-ui
   repositoryUrl: ghcr.io/apeirora/ocm
   secretRefName: ghcr-credentials
-  semver: 0.14.4-rc.3
+  semver: 0.14.4-rc.4
   interval: 1m
 operator:
   clientSecrets: []
