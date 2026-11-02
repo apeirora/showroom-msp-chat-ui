@@ -143,10 +143,20 @@ func oauthConfiguration(e accesspolicy.Entry) ([]byte, error) {
 func oauthArguments(publicURL string) []string {
 	return []string{"--alpha-config=/etc/chat-ui-access/oauth.json",
 		"--redirect-url=" + publicURL + "/oauth2/callback", "--cookie-name=" + accessgate.CookieName,
-		"--cookie-secret-file=/etc/chat-ui-session/cookie-secret", "--cookie-secure=true", "--cookie-httponly=true",
+		"--cookie-secret-file=/etc/chat-ui-access/cookie-secret", "--cookie-secure=true", "--cookie-httponly=true",
 		"--cookie-samesite=lax", "--cookie-expire=1h", "--cookie-refresh=1m", "--cookie-csrf-per-request=true",
 		"--cookie-csrf-per-request-limit=5", "--email-domain=*", "--skip-provider-button=true",
 		"--skip-jwt-bearer-tokens=false", "--reverse-proxy=false", "--request-logging=false", "--auth-logging=false"}
+}
+
+// OAuth2 Proxy accepts URL-safe base64. Keep session Secret storage unchanged,
+// including legacy keys, and preserve padding so working cookie signatures stay valid.
+func oauthCookieSecret(encoded []byte) ([]byte, error) {
+	key, err := base64.StdEncoding.DecodeString(string(encoded))
+	if err != nil || len(key) != 32 {
+		return nil, errors.New("invalid session cookie key material")
+	}
+	return []byte(base64.URLEncoding.EncodeToString(key)), nil
 }
 
 func (r *ChatUIInstanceReconciler) prepareAccess(ctx context.Context, inst *uiapi.ChatUIInstance, host string) (*accessBundle, error) {
@@ -171,6 +181,10 @@ func (r *ChatUIInstanceReconciler) prepareAccess(ctx context.Context, inst *uiap
 	if err != nil {
 		return nil, err
 	}
+	cookieSecret, err := oauthCookieSecret(session.Data["cookie-secret"])
+	if err != nil {
+		return nil, err
+	}
 	publicURL := "https://" + host
 	gate, err := json.Marshal(accessgate.Config{KCPServer: r.AccessPolicy.KCPServer, KCPCA: r.AccessPolicy.KCPCA, PublicURL: publicURL,
 		Issuer: e.Issuer, ClientID: e.ClientID, Source: e.Source})
@@ -181,7 +195,7 @@ func (r *ChatUIInstanceReconciler) prepareAccess(ctx context.Context, inst *uiap
 	if err != nil {
 		return nil, err
 	}
-	data := map[string][]byte{"gate.json": gate, "oauth.json": oauth, "client-secret": credential.Data["client_secret"], "chatui_guard.py": webuiguard.Source}
+	data := map[string][]byte{"gate.json": gate, "oauth.json": oauth, "client-secret": credential.Data["client_secret"], "cookie-secret": cookieSecret, "chatui_guard.py": webuiguard.Source}
 	serialized, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
@@ -293,7 +307,7 @@ func applyAccessDeployment(deploy *appsv1.Deployment, inst *uiapi.ChatUIInstance
 	gate.LivenessProbe.HTTPGet.Port = intstr.FromInt(8083)
 	oauth := corev1.Container{Name: "oauth2-proxy", Image: accesspolicy.OAuthImage, Args: oauthArguments(b.publicURL), SecurityContext: accessSecurityContext(),
 		Ports:          []corev1.ContainerPort{{Name: "http", ContainerPort: 8080}},
-		VolumeMounts:   []corev1.VolumeMount{{Name: "oauth-config", MountPath: "/etc/chat-ui-access", ReadOnly: true}, {Name: "oauth-session", MountPath: "/etc/chat-ui-session", ReadOnly: true}},
+		VolumeMounts:   []corev1.VolumeMount{{Name: "oauth-config", MountPath: "/etc/chat-ui-access", ReadOnly: true}},
 		ReadinessProbe: chatUIHTTPProbe(5, 6), LivenessProbe: chatUIHTTPProbe(10, 6)}
 	oauth.ReadinessProbe.HTTPGet.Path = "/ping"
 	oauth.LivenessProbe.HTTPGet.Path = "/ping"
@@ -301,8 +315,7 @@ func applyAccessDeployment(deploy *appsv1.Deployment, inst *uiapi.ChatUIInstance
 	pod.Spec.Volumes = []corev1.Volume{
 		{Name: "webui-guard", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: b.name, Items: []corev1.KeyToPath{{Key: "chatui_guard.py", Path: "chatui_guard.py"}}}}},
 		{Name: "gate-config", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: b.name, Items: []corev1.KeyToPath{{Key: "gate.json", Path: "gate.json"}}}}},
-		{Name: "oauth-config", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: b.name, Items: []corev1.KeyToPath{{Key: "oauth.json", Path: "oauth.json"}, {Key: "client-secret", Path: "client-secret"}}}}},
-		{Name: "oauth-session", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: b.sessionName, Items: []corev1.KeyToPath{{Key: "cookie-secret", Path: "cookie-secret"}}}}},
+		{Name: "oauth-config", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: b.name, Items: []corev1.KeyToPath{{Key: "oauth.json", Path: "oauth.json"}, {Key: "client-secret", Path: "client-secret"}, {Key: "cookie-secret", Path: "cookie-secret"}}}}},
 		{Name: "webui-data", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
 		{Name: "webui-tmp", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
 	}

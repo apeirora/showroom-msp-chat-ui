@@ -34,9 +34,21 @@ import (
 
 // Opt-in test uses the executable extracted from the pinned OAuth2 Proxy image.
 // All listeners are loopback and all identities/keys are disposable fixtures.
-//
-//nolint:gocyclo // One sequential, isolated protocol fixture verifies the full redirect and refresh chain.
 func TestPinnedOAuthRuntime(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		key  []byte
+	}{
+		{"working-legacy", make([]byte, 32)},
+		{"legacy-slash", bytes.Repeat([]byte{255}, 32)},
+		{"legacy-plus", bytes.Repeat([]byte{251}, 32)},
+	} {
+		t.Run(tc.name, func(t *testing.T) { testPinnedOAuthRuntime(t, tc.key) })
+	}
+}
+
+//nolint:gocyclo // One sequential, isolated protocol fixture verifies the full redirect and refresh chain.
+func testPinnedOAuthRuntime(t *testing.T, sessionKey []byte) {
 	binary := os.Getenv("CHATUI_TEST_OAUTH_PROXY")
 	if binary == "" {
 		t.Skip("set CHATUI_TEST_OAUTH_PROXY to the pinned image executable")
@@ -161,14 +173,18 @@ func TestPinnedOAuthRuntime(t *testing.T) {
 	alpha["upstreamConfig"].(map[string]any)["upstreams"].([]any)[0].(map[string]any)["uri"] = gate.URL + "/"
 	alpha["server"] = map[string]any{"bindAddress": address}
 	config, _ = json.Marshal(alpha)
-	for name, data := range map[string][]byte{"oauth.json": config, "client-secret": []byte("fixture-client-secret"), "cookie-secret": []byte(base64.StdEncoding.EncodeToString(make([]byte, 32))), "ca.pem": ca} {
+	cookieSecret, err := oauthCookieSecret([]byte(base64.StdEncoding.EncodeToString(sessionKey)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, data := range map[string][]byte{"oauth.json": config, "client-secret": []byte("fixture-client-secret"), "cookie-secret": cookieSecret, "ca.pem": ca} {
 		if err := os.WriteFile(filepath.Join(directory, name), data, 0600); err != nil {
 			t.Fatal(err)
 		}
 	}
 	args := oauthArguments(frontend.URL)
 	for i, arg := range args {
-		args[i] = strings.ReplaceAll(strings.ReplaceAll(arg, "/etc/chat-ui-access/", directory+"/"), "/etc/chat-ui-session/", directory+"/")
+		args[i] = strings.ReplaceAll(arg, "/etc/chat-ui-access/", directory+"/")
 		if strings.HasPrefix(arg, "--http-address=") {
 			args[i] = "--http-address=" + address
 		}

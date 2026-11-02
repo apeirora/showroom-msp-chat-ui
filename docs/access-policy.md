@@ -151,6 +151,10 @@ streams; size and monitor KCP capacity before rollout.
 
 Session signing keys are independently generated from cryptographic randomness.
 Session and configuration Secrets are immutable and owned by the MSP instance.
+The stored session keys keep their original encoding. The generated access bundle
+contains a padded URL-safe copy of the cookie key for OAuth2 Proxy, mounted only
+in that container. This preserves the session Secret and the exact signing string
+of previously working cookies when upgrading or rotating the KCP CA.
 The controller records their API-server-assigned UIDs in `status.accessSecretUIDs`
 and confirms persistence before creating a workload. Copied ownership metadata or
 delete/recreate under the same name does not satisfy a pin. Configuration bundles
