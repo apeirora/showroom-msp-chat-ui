@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.4-rc.2](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.4-rc.1...v0.14.4-rc.2) (2026-11-02)
+
+
+### Bug Fixes
+
+* **controller:** preserve trusted CA rollback history ([#143](https://github.com/apeirora/showroom-msp-chat-ui/issues/143)) ([3dca6d9](https://github.com/apeirora/showroom-msp-chat-ui/commit/3dca6d995b3a20234e7fb3e6eba2e7571a5cd0cd))
+
 ## [0.14.4-rc.1](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.3...v0.14.4-rc.1) (2026-10-28)
 
 
