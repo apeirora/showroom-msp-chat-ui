@@ -222,7 +222,7 @@ func TestKCPTrustRotationReplacesAccessRuntime(t *testing.T) {
 		if !mounted {
 			t.Fatal("replacement access proxy does not mount its new configuration")
 		}
-		for _, key := range []string{"oauth.json", "client-secret", "chatui_guard.py"} {
+		for _, key := range []string{"oauth.json", "client-secret", "cookie-secret", "chatui_guard.py"} {
 			if !reflect.DeepEqual(secret.Data[key], secretA.Data[key]) {
 				t.Fatalf("CA-only rotation changed %s", key)
 			}
