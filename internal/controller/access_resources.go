@@ -305,6 +305,10 @@ func applyAccessDeployment(deploy *appsv1.Deployment, inst *uiapi.ChatUIInstance
 	gate.ReadinessProbe.HTTPGet.Port = intstr.FromInt(8083)
 	gate.LivenessProbe.HTTPGet.Path = "/readyz"
 	gate.LivenessProbe.HTTPGet.Port = intstr.FromInt(8083)
+	// The access probe waits for WebUI, so give both containers the same startup allowance.
+	gate.StartupProbe = gate.LivenessProbe.DeepCopy()
+	gate.StartupProbe.PeriodSeconds = app.StartupProbe.PeriodSeconds
+	gate.StartupProbe.FailureThreshold = app.StartupProbe.FailureThreshold
 	oauth := corev1.Container{Name: "oauth2-proxy", Image: accesspolicy.OAuthImage, Args: oauthArguments(b.publicURL), SecurityContext: accessSecurityContext(),
 		Ports:          []corev1.ContainerPort{{Name: "http", ContainerPort: 8080}},
 		VolumeMounts:   []corev1.VolumeMount{{Name: "oauth-config", MountPath: "/etc/chat-ui-access", ReadOnly: true}},
