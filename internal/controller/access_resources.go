@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"strings"
 
@@ -49,7 +50,7 @@ func (r *ChatUIInstanceReconciler) sessionSecret(ctx context.Context, inst *uiap
 	var secret corev1.Secret
 	key := client.ObjectKey{Namespace: inst.Namespace, Name: sessionSecretName(inst)}
 	if err := r.routeReader().Get(ctx, key, &secret); err == nil {
-		if !ownedByInstance(&secret, inst) || secret.Immutable == nil || !*secret.Immutable ||
+		if !ownedByInstance(&secret, inst) || secret.Immutable == nil || !*secret.Immutable || secret.DeletionTimestamp != nil ||
 			secret.UID == "" || inst.Status.AccessSecretUIDs[secret.Name] != string(secret.UID) {
 			return nil, errors.New("session Secret ownership or immutability mismatch")
 		}
@@ -93,13 +94,21 @@ func (r *ChatUIInstanceReconciler) pinAccessSecret(ctx context.Context, inst *ui
 	if secret.UID == "" {
 		return errors.New("API server did not assign an access Secret UID")
 	}
-	before := inst.DeepCopy()
-	pins := map[string]string{secret.Name: string(secret.UID)}
-	if uid := inst.Status.AccessSecretUIDs[sessionSecretName(inst)]; uid != "" {
-		pins[sessionSecretName(inst)] = uid
+	pins := maps.Clone(inst.Status.AccessSecretUIDs)
+	if pins == nil {
+		pins = make(map[string]string)
 	}
-	inst.Status.AccessSecretUIDs = pins
-	if err := r.Status().Patch(ctx, inst, client.MergeFromWithOptions(before, client.MergeFromWithOptimisticLock{})); err != nil {
+	pins[secret.Name] = string(secret.UID)
+	if len(pins) > maxAccessBundles+1 {
+		return errors.New("access Secret history is full")
+	}
+	return r.persistAccessSecretPins(ctx, inst, pins)
+}
+
+func (r *ChatUIInstanceReconciler) persistAccessSecretPins(ctx context.Context, inst *uiapi.ChatUIInstance, pins map[string]string) error {
+	updated := inst.DeepCopy()
+	updated.Status.AccessSecretUIDs = pins
+	if err := r.Status().Patch(ctx, updated, client.MergeFromWithOptions(inst, client.MergeFromWithOptimisticLock{})); err != nil {
 		return err
 	}
 	var persisted uiapi.ChatUIInstance
@@ -182,7 +191,7 @@ func (r *ChatUIInstanceReconciler) prepareAccess(ctx context.Context, inst *uiap
 	var existing corev1.Secret
 	key := client.ObjectKey{Namespace: inst.Namespace, Name: name}
 	if err := r.routeReader().Get(ctx, key, &existing); err == nil {
-		if !ownedByInstance(&existing, inst) || existing.Immutable == nil || !*existing.Immutable || !reflect.DeepEqual(existing.Data, data) ||
+		if !ownedByInstance(&existing, inst) || existing.Immutable == nil || !*existing.Immutable || existing.DeletionTimestamp != nil || !reflect.DeepEqual(existing.Data, data) ||
 			existing.UID == "" || inst.Status.AccessSecretUIDs[existing.Name] != string(existing.UID) {
 			return nil, errors.New("access Secret ownership or content mismatch")
 		}
@@ -191,6 +200,9 @@ func (r *ChatUIInstanceReconciler) prepareAccess(ctx context.Context, inst *uiap
 	} else {
 		if inst.Status.AccessSecretUIDs[name] != "" {
 			return nil, errors.New("pinned access Secret is missing; operator recovery required")
+		}
+		if err := r.makeAccessSecretRoom(ctx, inst); err != nil {
+			return nil, err
 		}
 		secret := corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: inst.Namespace}, Type: corev1.SecretTypeOpaque, Immutable: ptrTo(true), Data: data}
 		if err := ctrl.SetControllerReference(inst, &secret, r.Scheme); err != nil {

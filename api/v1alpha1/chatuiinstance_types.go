@@ -51,7 +51,8 @@ type ChatUIInstanceSpec struct {
 // ChatUIInstanceStatus defines the observed state of ChatUIInstance
 type ChatUIInstanceStatus struct {
 	// AccessSecretUIDs pins server-assigned identities of controller-created keys
-	// and the current immutable access bundle. Recreated Secrets are not adopted.
+	// and up to three immutable access bundles for bounded rollback history.
+	// Recreated Secrets are not adopted.
 	AccessSecretUIDs map[string]string `json:"accessSecretUIDs,omitempty"`
 
 	// Phase is a high-level summary of the instance lifecycle (e.g., "Ready").

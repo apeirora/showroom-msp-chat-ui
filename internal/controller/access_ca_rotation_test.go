@@ -255,6 +255,23 @@ func TestKCPTrustRotationReplacesAccessRuntime(t *testing.T) {
 	if !reflect.DeepEqual(secretA.Data, unchangedA.Data) || secretA.UID != unchangedA.UID {
 		t.Fatal("rotation modified the prior immutable access configuration")
 	}
+	rollback, rollbackSecret := rotate(caA+caB, bundleB)
+	gateB.Close()
+	if rollback.name != overlap.name || rollbackSecret.UID != overlapSecret.UID {
+		t.Fatal("rollback did not reuse the previously pinned overlap configuration")
+	}
+	gateRollback := startGate(rollbackSecret)
+	leaf.Store(&leafA)
+	request(gateRollback, true)
+	leaf.Store(&leafB)
+	request(gateRollback, true)
+	bundleB, secretB = rotate(caB, rollback)
+	gateRollback.Close()
+	gateB = startGate(secretB)
+	request(gateB, true)
+	leaf.Store(&leafA)
+	request(gateB, false)
+	leaf.Store(&leafB)
 	before := readDeployment()
 	stable, _ := prepare(caB)
 	if stable.name != bundleB.name || stable.revision != bundleB.revision {

@@ -96,7 +96,7 @@ type DNSChecker func(ctx context.Context, host string) error
 //+kubebuilder:rbac:groups=ui.privatellms.msp,resources=chatuiinstances/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=ui.privatellms.msp,resources=chatuiinstances/finalizers,verbs=update
 // core + apps
-//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;delete
 //+kubebuilder:rbac:groups="",resources=endpoints,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete

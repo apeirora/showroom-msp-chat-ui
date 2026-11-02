@@ -89,7 +89,8 @@ spec:
                   type: string
                 description: |-
                   AccessSecretUIDs pins server-assigned identities of controller-created keys
-                  and the current immutable access bundle. Recreated Secrets are not adopted.
+                  and up to three immutable access bundles for bounded rollback history.
+                  Recreated Secrets are not adopted.
                 type: object
               conditions:
                 description: Conditions represent the latest available observations
