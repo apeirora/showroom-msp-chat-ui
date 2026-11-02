@@ -7,7 +7,8 @@
       "bump-patch-for-minor-pre-major": false,
       "draft": false,
       "prerelease": true,
-      "release-as": "0.14.4-rc.1",
+      "versioning": "prerelease",
+      "prerelease-type": "rc",
       "extra-files": [
         {
           "type": "yaml",
