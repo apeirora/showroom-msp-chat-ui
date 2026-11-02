@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.4-rc.3](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.4-rc.2...v0.14.4-rc.3) (2026-11-02)
+
+
+### Bug Fixes
+
+* **controller:** normalize OAuth cookie secret encoding ([#146](https://github.com/apeirora/showroom-msp-chat-ui/issues/146)) ([03a0b03](https://github.com/apeirora/showroom-msp-chat-ui/commit/03a0b035cbad3006876003fdf0e85fafb6a66d4f))
+
 ## [0.14.4-rc.2](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.4-rc.1...v0.14.4-rc.2) (2026-11-02)
 
 
