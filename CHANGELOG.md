@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.4-rc.4](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.4-rc.3...v0.14.4-rc.4) (2026-11-02)
+
+
+### Bug Fixes
+
+* **controller:** Allow WebUI initialization before access liveness ([#148](https://github.com/apeirora/showroom-msp-chat-ui/issues/148)) ([6610dcf](https://github.com/apeirora/showroom-msp-chat-ui/commit/6610dcf9288ce4d08aac85ee3f8ea7ae48ae174b))
+
 ## [0.14.4-rc.3](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.4-rc.2...v0.14.4-rc.3) (2026-11-02)
 
 
