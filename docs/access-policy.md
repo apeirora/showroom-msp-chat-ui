@@ -162,7 +162,24 @@ workload, inspect the orphan/current pins and explicitly recover the intended
 identity through the platform owner before restarting. Deleting a pinned Secret
 alone is not a supported rotation procedure. Routine OIDC credential/config rotation
 creates a new bundle and performs the same stopped-pod cutover. Reverting to an old
-bundle also requires reviewed recovery because only the current bundle is pinned.
+bundle reuses its original UID pin while it remains in the bounded history: the
+session pin plus at most three configuration pins. This supports old CA, overlap,
+new CA, overlap rollback, and new CA again without changing session keys.
+
+Before creating a fourth configuration, the controller retires the oldest unused
+pinned bundle. It checks Deployment templates and all Pods, including terminating
+Pods, for the access Secret volume and common environment/projected-volume
+references. The managed Recreate Deployment's prior ReplicaSets have been scaled
+down by the existing stopped-pod cutover before its template can change.
+Retirement verifies ownership, immutability and
+the pinned UID, deletes with UID and resource-version preconditions, confirms the
+Secret is gone, then removes its status pin with an optimistic concurrency check.
+If all retained bundles are in use, reconciliation fails closed until one can be
+retired. A stopped cleanup can finish removing a missing, unused non-desired pin.
+A desired bundle that is missing or has a different UID still requires recovery.
+Returning to an already retired configuration creates and pins a fresh Secret;
+an existing unpinned orphan is never adopted. Old unpinned bundles left by earlier
+controller versions still require the explicit recovery described above.
 
 Instance namespaces, controller status, pod admission and operator configuration
 remain platform-controlled. UID checks are not admission controls against arbitrary
