@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.4](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.4-rc.4...v0.14.4) (2026-11-05)
+
+
+### Documentation
+
+* Describe the stable release track ([#151](https://github.com/apeirora/showroom-msp-chat-ui/issues/151)) ([4d943ab](https://github.com/apeirora/showroom-msp-chat-ui/commit/4d943ab6a0d82cc2b2f75a38ff7513920f60a686))
+
 ## [0.14.4-rc.4](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.4-rc.3...v0.14.4-rc.4) (2026-11-02)
 
 
