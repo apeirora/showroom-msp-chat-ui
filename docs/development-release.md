@@ -18,8 +18,9 @@ charts retain their existing independent source versions; the workflow sets the
 version/appVersion of every published chart package.
 
 Before activation, verify the exact release commit/tag, prerelease flag, image
-digest and platforms, all chart checksums and rendered operator defaults. Also
-verify that the prior stable release and `latest` image digest are unchanged.
+digest and platforms, all chart checksums and rendered operator defaults. For a
+stable tag, also verify that the prior stable tag is unchanged and that `latest`
+points to the new stable image digest; a prerelease must leave `latest` unchanged.
 The workflow currently treats OCM transfer failure as a warning; workflow success
 alone is therefore not proof that the OCM component is available. Verify the
 component separately when using the OCM installation path.
