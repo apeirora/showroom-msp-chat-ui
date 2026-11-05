@@ -219,11 +219,15 @@ Delete instances and their related replicas before a namespace change.
 
 ### Release channels
 
-The current configuration prepares the development prerelease `0.14.4-rc.1` with
-`prerelease: true`. Follow [development-release.md](docs/development-release.md)
-for artifact verification and migration prerequisites. Leave production deployment
-configuration unchanged. A later stable release needs a separate reviewed
-configuration change; do not use a manual tag or an old `Release-As` footer.
+The configuration releases stable versions with `prerelease: false`. Release
+`0.14.4` leaves the development release-candidate track: `versioning: prerelease`
+and `prerelease-type: rc` are removed and `release-as` selects the version.
+`release-as` alone does not start a release without a releasable commit, so the
+change that selects a stable version carries a new `Release-As` footer. Remove
+`release-as` after the stable tag exists. Follow
+[development-release.md](docs/development-release.md) for artifact verification
+and migration prerequisites. Do not create a manual tag or reuse an old
+`Release-As` footer.
 Check the release manifest, chart versions and controller image tag before
 merging the release PR.
 
