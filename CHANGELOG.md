@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.4](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.4...v0.14.4) (2026-11-06)
+
+
+### Bug Fixes
+
+* **deps:** update module go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp to v1.45.0 [security] ([#156](https://github.com/apeirora/showroom-msp-chat-ui/issues/156)) ([4563fe0](https://github.com/apeirora/showroom-msp-chat-ui/commit/4563fe059a62c72ee10193ce12a1e3385321f00c))
+
 ## [0.14.4](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.4-rc.4...v0.14.4) (2026-11-05)
 
 
