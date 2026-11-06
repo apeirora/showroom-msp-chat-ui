@@ -17,7 +17,7 @@ ui:
   contentPath: "/pm-content.json"
   image:
     repository: nginx
-    tag: "1.27"
+    tag: "1.31"
     pullPolicy: IfNotPresent
   resources: {}
   service:
