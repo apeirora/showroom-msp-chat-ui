@@ -215,11 +215,13 @@ func (e *Engine) Reconcile(ctx context.Context) (Result, error) {
 	if err != nil {
 		return result, err
 	}
-	first, stats, err := e.inventory(ctx, current.Pins)
+	pins, err := e.livePins(ctx, current.Pins)
 	if err != nil {
 		return result, err
 	}
-	pins, err := e.livePins(ctx, current.Pins)
+	// Inventory and binding must use the same live history. A removed pin must
+	// not exempt its replacement from the first-binding runtime checks.
+	first, stats, err := e.inventory(ctx, pins)
 	if err != nil {
 		return result, err
 	}
@@ -311,7 +313,7 @@ func (e *Engine) Reconcile(ctx context.Context) (Result, error) {
 	// External waits may have outlived the identities read above: read them again
 	// and publish nothing unless every identity behind a new pin or an active entry
 	// is still exactly the same. A failed read aborts; it is never "empty".
-	second, _, err := e.inventory(ctx, current.Pins)
+	second, _, err := e.inventory(ctx, pins)
 	if err != nil {
 		return result, err
 	}

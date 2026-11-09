@@ -1402,3 +1402,37 @@ func TestRetainedCallbackCapacityFailsBeforeAnyWrite(t *testing.T) {
 		})
 	}
 }
+
+// Replacing the CR does not prove its old named workload has been garbage-collected.
+func TestReplacedManagedPinCannotSkipPriorRuntimeCheck(t *testing.T) {
+	for _, duringProbe := range []bool{false, true} {
+		t.Run(fmt.Sprint(duringProbe), func(t *testing.T) {
+			w, e := newWorld(t)
+			old := entryFor("account-a", "default", "chat", "source-1", "runtime-1")
+			stored, err := json.Marshal(accesspolicy.EnrollmentDocument{Version: 1, Entries: []accesspolicy.Entry{old}, Pins: []accesspolicy.Entry{old}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			w.cm = enrollmentMap(string(stored))
+			w.add("account-a", "default", "chat", "source-1", "runtime-2")
+			prior := func() { w.runtimes = map[string]bool{mspKey("account-a", "default", "chat"): true} }
+			if duringProbe {
+				w.onList = func(_ *world, call int) {
+					if call == 2 {
+						prior()
+					}
+				}
+				mustFail(t, e)
+				if len(w.verified) != 1 || w.cmWrites != 0 {
+					t.Fatal("replacement was published after prior runtime appeared during probe")
+				}
+			} else {
+				prior()
+				result := mustReconcile(t, e)
+				if result.StaleBindings != 1 || result.Entries != 0 || result.Pins != 0 || len(w.verified) != 0 {
+					t.Fatalf("dead pin let a replacement adopt prior runtime: %+v", result)
+				}
+			}
+		})
+	}
+}
