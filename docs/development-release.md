@@ -1,14 +1,16 @@
 # Development and stable releases
 
-The current Release Please configuration targets the stable release `0.14.4`
-(`prerelease: false`, `release-as: 0.14.4`), which follows the tested
-`0.14.4-rc.4` development prerelease. Use the existing Release Please App workflow
-and review its generated release PR before merging. Do not create a manual tag or merge an older stable
-release proposal. The bot owns the manifest, changelog, chart-version and default
-image/component-version updates; this preparation does not edit them by hand.
+Release Please selects the next stable version from the release manifest and
+unreleased commits (`prerelease: false`, with no `release-as` override). Use the
+existing Release Please App workflow and review its generated release PR before
+merging. Confirm that the proposed version is not already published. Do not create
+a manual tag or merge an older release proposal. The bot owns the manifest,
+changelog, chart-version and default image/component-version updates.
 
 The tag workflow publishes the versioned multi-architecture controller image,
-which contains both `/manager` and `/access-proxy`, and all seven Helm charts.
+which contains `/manager`, `/access-proxy` and `/chat-ui-enrollment`, and all eight
+Helm charts. The enrollment chart remains disabled by default; follow its
+[separate activation prerequisites](automatic-enrollment.md) before enabling it.
 Prerelease tags never update the image's `latest` tag or GitHub's latest release;
 a stable tag may.
 The packaged standalone/umbrella operator defaults and OCM installer image
@@ -37,7 +39,8 @@ pod. Valid TLS material must exist in each runtime namespace. The empty policy
 defaults intentionally prevent startup.
 
 Do not deploy a release to production implicitly; production needs its own
-reviewed deployment change. Remove the fixed `release-as` override after the stable
-tag exists. Returning to development RCs requires an explicit configuration change
+reviewed deployment change. If a future release uses a fixed `release-as`
+override, remove it after that tag exists. Returning to development RCs requires
+an explicit configuration change
 (`prerelease: true`, `versioning: prerelease`, `prerelease-type: rc`) and the same
 artifact and migration verification.

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.14.5](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.4...v0.14.5) (2026-11-09)
+
+
+### Bug Fixes
+
+* **auth:** Enroll new Chat UI instances through trusted platform APIs ([#172](https://github.com/apeirora/showroom-msp-chat-ui/issues/172)) ([604312c](https://github.com/apeirora/showroom-msp-chat-ui/commit/604312cdf67e3f00f1d9df0f3ed8a982ca06e653))
+* **deps:** update module go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp to v1.45.0 [security] ([#156](https://github.com/apeirora/showroom-msp-chat-ui/issues/156)) ([4563fe0](https://github.com/apeirora/showroom-msp-chat-ui/commit/4563fe059a62c72ee10193ce12a1e3385321f00c))
+
 ## [0.14.4](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.4-rc.4...v0.14.4) (2026-11-05)
 
 
