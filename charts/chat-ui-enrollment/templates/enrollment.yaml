@@ -1,0 +1,143 @@
+{{- if .Values.enabled }}
+{{- if not (regexMatch "^[a-z0-9][a-z0-9./:_-]*@sha256:[a-f0-9]{64}$" .Values.image) }}
+{{- fail "enrollment requires a released, digest-pinned image" }}
+{{- end }}
+{{- $clients := required "configuration.clients is required" .Values.configuration.clients }}
+{{- if or (not (kindIs "slice" $clients)) (eq (len $clients) 0) }}
+{{- fail "configuration.clients is required and must be a nonempty list" }}
+{{- end }}
+{{- $serviceAccount := required "serviceAccountName is required" .Values.serviceAccountName }}
+{{- $kcpSecret := required "kcpKubeconfigSecret.name is required" .Values.kcpKubeconfigSecret.name }}
+{{- $mspSecret := required "mspKubeconfigSecret.name is required" .Values.mspKubeconfigSecret.name }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $serviceAccount | quote }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-enrollment
+rules:
+  - apiGroups: [openidclient.keycloak.crossplane.io]
+    resources: [clients]
+    resourceNames:
+      {{- range $clients }}
+      - {{ required "every enrollment client needs a resource name" .name | quote }}
+      {{- end }}
+    verbs: [get, patch]
+  - apiGroups: [""]
+    resources: [namespaces]
+    resourceNames: [kube-system]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-enrollment
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-enrollment
+subjects:
+  - kind: ServiceAccount
+    name: {{ $serviceAccount | quote }}
+    namespace: {{ .Release.Namespace | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configuration
+data:
+  config.json: {{ .Values.configuration | toJson | quote }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: chat-ui-enrollment
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      annotations:
+        checksum/configuration: {{ .Values.configuration | toJson | sha256sum }}
+      labels:
+        app.kubernetes.io/name: chat-ui-enrollment
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      serviceAccountName: {{ $serviceAccount | quote }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: enrollment
+          image: {{ .Values.image | quote }}
+          command: [/chat-ui-enrollment]
+          args:
+            - --config=/etc/enrollment/config.json
+            - --kcp-kubeconfig=/etc/enrollment-kcp/kubeconfig
+            - --msp-kubeconfig=/etc/enrollment-msp/kubeconfig
+            - --platform-in-cluster
+            - --apply
+            - --interval={{ .Values.interval }}
+            - --health-address=:8090
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: health
+              containerPort: 8090
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: configuration
+              mountPath: /etc/enrollment
+              readOnly: true
+            - name: kcp
+              mountPath: /etc/enrollment-kcp
+              readOnly: true
+            - name: msp
+              mountPath: /etc/enrollment-msp
+              readOnly: true
+      volumes:
+        - name: configuration
+          configMap:
+            name: {{ .Release.Name }}-configuration
+        - name: kcp
+          secret:
+            secretName: {{ $kcpSecret | quote }}
+            defaultMode: 0440
+            items:
+              - key: {{ .Values.kcpKubeconfigSecret.key | quote }}
+                path: kubeconfig
+        - name: msp
+          secret:
+            secretName: {{ $mspSecret | quote }}
+            defaultMode: 0440
+            items:
+              - key: {{ .Values.mspKubeconfigSecret.key | quote }}
+                path: kubeconfig
+{{- end }}

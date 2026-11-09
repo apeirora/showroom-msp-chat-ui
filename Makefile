@@ -350,12 +350,18 @@ catalog-push: ## Push a catalog image.
 .PHONY: helm-lint
 helm-lint: ## lint all helm charts
 	helm lint charts/chat-ui-operator
+	helm lint charts/chat-ui-enrollment
 	helm lint charts/chat-ui-pm-integration
 	helm lint charts/chat-ui-sync-agent
 
 .PHONY: helm-package
+.PHONY: helm-test-enrollment
+helm-test-enrollment: ## test enrollment chart activation and scoped permissions
+	python3 hack/test-chat-ui-enrollment-chart.py
+
 helm-package: chart ## package all helm charts
 	mkdir -p dist
 	helm package charts/chat-ui-operator -d dist
+	helm package charts/chat-ui-enrollment -d dist
 	helm package charts/chat-ui-pm-integration -d dist
 	helm package charts/chat-ui-sync-agent -d dist

@@ -99,6 +99,7 @@ jobs:
       matrix:
         chart:
           - chat-ui-operator
+          - chat-ui-enrollment
           - chat-ui-operator-ocm
           - chat-ui-sync-agent
           - chat-ui-pm-integration
@@ -169,7 +170,7 @@ jobs:
       CHART_REGISTRY: ${{ needs.publish-image.outputs.chart_registry }}
       OCM_REPOSITORY: ${{ needs.publish-image.outputs.ocm_repository }}
       PUBLISH_LATEST: ${{ needs.publish-image.outputs.publish_latest }}
-      HELM_CHARTS: "chat-ui-operator chat-ui-operator-ocm chat-ui-sync-agent chat-ui-pm-integration chat-ui-ui chat-ui-msp-app chat-ui-pm-app"
+      HELM_CHARTS: "chat-ui-operator chat-ui-enrollment chat-ui-operator-ocm chat-ui-sync-agent chat-ui-pm-integration chat-ui-ui chat-ui-msp-app chat-ui-pm-app"
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

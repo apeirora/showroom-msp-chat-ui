@@ -18,6 +18,7 @@ on:
       - '.github/workflows/ci.yml'
       - 'hack/validate-ord.mjs'
       - 'hack/test-chat-ui-ui-chart.sh'
+      - 'hack/test-chat-ui-enrollment-chart.py'
       - 'hack/release-image-tags.sh'
       - 'hack/set-release-image.py'
       - 'hack/test-release-image-tags.py'
@@ -161,6 +162,7 @@ jobs:
       matrix:
         chart:
           - chat-ui-operator
+          - chat-ui-enrollment
           - chat-ui-operator-ocm
           - chat-ui-pm-integration
           - chat-ui-sync-agent
@@ -175,7 +177,7 @@ jobs:
         uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4
 
       - name: Install chart test dependency
-        if: matrix.chart == 'chat-ui-sync-agent'
+        if: matrix.chart == 'chat-ui-sync-agent' || matrix.chart == 'chat-ui-enrollment'
         run: python3 -m pip install PyYAML==6.0.3
 
       - name: Lint, template, and package chart
@@ -199,6 +201,9 @@ jobs:
           fi
           if [ "$chart" = "chat-ui-sync-agent" ]; then
             bash hack/test-chat-ui-sync-agent-chart.sh "$chart_dir"
+          fi
+          if [ "$chart" = "chat-ui-enrollment" ]; then
+            python3 hack/test-chat-ui-enrollment-chart.py
           fi
           mkdir -p "$out_dir"
           helm package "$chart_dir" --destination "$out_dir"

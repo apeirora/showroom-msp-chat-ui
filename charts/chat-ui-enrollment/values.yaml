@@ -1,0 +1,20 @@
+# Install on the platform cluster that owns the Crossplane Keycloak Clients.
+# Disabled defaults render no workload and grant no permissions.
+enabled: false
+image: '' # Released controller image, including @sha256 digest.
+imagePullSecrets: []
+serviceAccountName: chat-ui-enrollment
+interval: 30s
+kcpKubeconfigSecret:
+  name: '' # Existing, scoped read-only access to approved KCP workspaces.
+  key: kubeconfig
+mspKubeconfigSecret:
+  name: '' # Existing, scoped read access and named enrollment ConfigMap patch access.
+  key: kubeconfig
+configuration: {}
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi

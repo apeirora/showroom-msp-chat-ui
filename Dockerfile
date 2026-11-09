@@ -21,6 +21,9 @@ COPY internal/accesspolicy/ internal/accesspolicy/
 COPY internal/accessgate/ internal/accessgate/
 COPY internal/webuiguard/ internal/webuiguard/
 COPY cmd/access-proxy/ cmd/access-proxy/
+COPY internal/enrollment/ internal/enrollment/
+COPY internal/enrollmentkube/ internal/enrollmentkube/
+COPY cmd/enrollment/ cmd/enrollment/
 
 # Build
 # the GOARCH has not a default value to allow the binary be built according to the host where the command
@@ -29,6 +32,7 @@ COPY cmd/access-proxy/ cmd/access-proxy/
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -ldflags "-X main.version=${VERSION}" -o manager cmd/main.go
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -o access-proxy ./cmd/access-proxy
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -o chat-ui-enrollment ./cmd/enrollment
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
@@ -36,6 +40,7 @@ FROM gcr.io/distroless/static:nonroot@sha256:e8a4044e0b4ae4257efa45fc026c0bc30ad
 WORKDIR /
 COPY --from=builder /workspace/manager .
 COPY --from=builder /workspace/access-proxy .
+COPY --from=builder /workspace/chat-ui-enrollment .
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]

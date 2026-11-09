@@ -83,9 +83,12 @@ revocation; never sync the registration-management token to a tenant pod.
 The source UID cannot be inferred from the MSP object's UID. Read both objects
 through trusted access and bind them explicitly. Tenant labels, annotations,
 source spec and reported status do not select the authorization target or issuer.
-New instances remain inaccessible until an operator-reviewed mapping and client
-configuration exist. A source or MSP object recreated under the same name requires
-a new mapping. This version does not automate client registration or mapping.
+New instances remain inaccessible until a trusted mapping and client configuration
+exist. The default uses operator-reviewed static mappings. Optional
+[automatic enrollment](automatic-enrollment.md) can register exact callbacks and
+publish bindings for explicitly approved KCP workspaces; it is disabled by default
+and requires a separate credential and ownership handoff. A source recreated under
+the same name cannot inherit the surviving MSP runtime's binding.
 
 ### Client-secret delivery
 
