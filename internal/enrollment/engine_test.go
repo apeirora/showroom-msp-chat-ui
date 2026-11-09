@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"slices"
 	"strings"
 	"testing"
@@ -1156,7 +1157,7 @@ func TestConfigurationGraphIsValidatedBeforeAnyAdapterCall(t *testing.T) {
 		"nested label":              baseURI("https://a.b.chat.example.test/oauth2/callback"),
 		"apex host":                 baseURI("https://chat.example.test/oauth2/callback"),
 		"port":                      baseURI("https://admin.chat.example.test:8443/oauth2/callback"),
-		"userinfo":                  baseURI("https://user@admin.chat.example.test/oauth2/callback"),
+		"userinfo":                  baseURI((&url.URL{Scheme: "https", Host: "admin." + publicHost, Path: CallbackPath, User: url.User("synthetic-user")}).String()),
 		"suffix lookalike":          baseURI("https://admin.evilchat.example.test/oauth2/callback"),
 		"uppercase":                 baseURI("https://ADMIN.chat.example.test/oauth2/callback"),
 		"whitespace":                baseURI("https://admin.chat.example.test/oauth2/callback "),
