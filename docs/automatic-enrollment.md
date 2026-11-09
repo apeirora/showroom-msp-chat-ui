@@ -94,9 +94,22 @@ of `spec.forProvider.validRedirectUris` and `webOrigins` before enabling enrollm
 1. Record the existing exact callbacks and origins for review and rollback.
 2. Prepare the change in the owning GitOps repository so it no longer reconciles
    those two fields. Keep its other Client security settings managed there.
+   Keep the Client object declared: pruning it can delete the Keycloak client.
+   Removing fields from an apply or Helm manifest can also delete their live
+   values. For every affected Client, verify that the owner's actual update
+   mechanism preserves all callbacks and origins. For server-side apply, use a
+   server-side dry-run with its real field manager and the exact post-change
+   rendered manifest. A textual diff alone is insufficient. If values would be
+   removed, stop and review a preservation step before changing the declaration.
+   A passing dry-run is a prediction, not proof of the completed handoff.
 3. Verify live `metadata.managedFields`: no manager other than
    `chat-ui-enrollment` may own either callback field. This includes Helm, Flux,
    Argo, kubectl and the provider; a guessed controller name is not exempt.
+   An empty or absent list alone does not prove the declaring controller has
+   relinquished the fields. Confirm that it applied the post-change revision and
+   is Ready, then re-read unchanged callbacks and origins after a full reconcile
+   interval. Use the established operator-admin read path to verify the Keycloak
+   registration too; do not give the enroller Keycloak admin credentials.
 4. Add the explicit annotation
    `chatui.msp.apeirora.eu/enrollment-owned-callbacks: "true"` through the owner.
    The annotation alone does not bypass the field-ownership check.
