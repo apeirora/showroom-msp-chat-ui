@@ -160,7 +160,7 @@ func oauthCookieSecret(encoded []byte) ([]byte, error) {
 }
 
 func (r *ChatUIInstanceReconciler) prepareAccess(ctx context.Context, inst *uiapi.ChatUIInstance, host string) (*accessBundle, error) {
-	e, err := r.AccessPolicy.Select(inst)
+	e, err := r.selectAccessEntry(ctx, inst)
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +252,23 @@ func (r *ChatUIInstanceReconciler) withdrawAccess(ctx context.Context, inst *uia
 
 func (r *ChatUIInstanceReconciler) denyAccess(ctx context.Context, inst *uiapi.ChatUIInstance, cause error) (ctrl.Result, error) {
 	withdrawErr := r.withdrawAccess(ctx, inst)
+	if errors.Is(cause, errEnrollmentUnavailable) {
+		// No grant is inferred from a failed read. Withdraw the route but preserve
+		// the workload so recovery does not require a fleet-wide Pod restart.
+		statusErr := r.updateImagePolicyStatus(ctx, inst, phaseProvisioning, "AccessEnrollmentUnavailable", "Waiting for sign-in configuration")
+		return ctrl.Result{RequeueAfter: hostnameRecheckAfter}, errors.Join(withdrawErr, statusErr)
+	}
 	_, stopErr := r.stopUnapprovedDeployment(ctx, inst, true)
+	if r.AccessPolicy != nil && r.AccessPolicy.Enrollment != nil && errors.Is(cause, accesspolicy.ErrUnmapped) {
+		phase, reason, message := phaseError, "AccessNotConfigured", "Instance access is unavailable"
+		if len(inst.Status.AccessSecretUIDs) == 0 {
+			phase, reason, message = phaseProvisioning, "AccessEnrollmentPending", "Preparing sign-in access"
+		}
+		statusErr := r.updateImagePolicyStatus(ctx, inst, phase, reason, message)
+		// A registration wait is expected, not an exponential-backoff error. Route
+		// withdrawal and workload shutdown must still succeed before retrying.
+		return ctrl.Result{RequeueAfter: hostnameRecheckAfter}, errors.Join(withdrawErr, stopErr, statusErr)
+	}
 	statusErr := r.updateImagePolicyStatus(ctx, inst, phaseError, "AccessNotConfigured", "Instance access configuration is unavailable; operator review is required")
 	// The detailed cause is operator-only; never copy credentials or internal errors into status.
 	return ctrl.Result{RequeueAfter: hostnameRecheckAfter}, errors.Join(cause, withdrawErr, stopErr, statusErr)

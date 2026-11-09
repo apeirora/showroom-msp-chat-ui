@@ -37,11 +37,12 @@ type Entry struct {
 }
 
 type Policy struct {
-	KCPServer            string  `json:"kcpServer"`
-	KCPCA                string  `json:"kcpCA,omitempty"`
-	CredentialsNamespace string  `json:"credentialsNamespace"`
-	ProxyImage           string  `json:"proxyImage"`
-	Entries              []Entry `json:"entries"`
+	KCPServer            string      `json:"kcpServer"`
+	KCPCA                string      `json:"kcpCA,omitempty"`
+	CredentialsNamespace string      `json:"credentialsNamespace"`
+	ProxyImage           string      `json:"proxyImage"`
+	Entries              []Entry     `json:"entries"`
+	Enrollment           *Enrollment `json:"enrollment,omitempty"`
 }
 
 // Decode strictly reads one bounded document; credentials are never logged.
@@ -92,6 +93,9 @@ func Parse(reader io.Reader) (*Policy, error) {
 	if len(validation.IsDNS1123Label(p.CredentialsNamespace)) != 0 ||
 		!regexp.MustCompile(`^[a-z0-9][a-z0-9./:_-]*@sha256:[a-f0-9]{64}$`).MatchString(p.ProxyImage) {
 		return nil, errors.New("access policy requires a credential namespace and digest-pinned proxy image")
+	}
+	if err := p.Enrollment.Validate(); err != nil {
+		return nil, err
 	}
 	uids, local, sources := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	for _, e := range p.Entries {
