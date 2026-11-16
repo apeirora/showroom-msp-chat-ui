@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.15.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.5...v0.15.0) (2026-11-16)
+
+
+### Features
+
+* **auth:** Give instances without a reviewed mapping a generated password ([#180](https://github.com/apeirora/showroom-msp-chat-ui/issues/180)) ([4c182fa](https://github.com/apeirora/showroom-msp-chat-ui/commit/4c182fadd853a2525af9520a92cf1f67972c46e5))
+
+
+### Bug Fixes
+
+* **deps:** update module go.opentelemetry.io/otel/sdk to v1.47.0 [security] ([#173](https://github.com/apeirora/showroom-msp-chat-ui/issues/173)) ([26441e4](https://github.com/apeirora/showroom-msp-chat-ui/commit/26441e42df0d11a1118dd2812ef643abed3e53e7))
+
 ## [0.14.5](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.4...v0.14.5) (2026-11-09)
 
 
