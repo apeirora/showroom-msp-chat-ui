@@ -170,7 +170,7 @@ A password instance differs from a mapped one in these points:
   and WebSocket routes are unchanged.
 - The password is 32 random bytes in the immutable Secret `chatui-login-<hash>`,
   owned by the instance and pinned by UID like the session key. The pod receives
-  only its SHA-256 digest. `status.loginSecretName` names the Secret, and the sync
+  only a PBKDF2-HMAC-SHA256 verifier of it (600,000 iterations). `status.loginSecretName` names the Secret, and the sync
   agent publishes it into the account that owns the instance
   (`publishedResources.loginSecrets.enabled`). Set `loginSecrets.cleanup: true` to
   remove that copy when the instance is deleted; it needs api-syncagent v0.7.0 or

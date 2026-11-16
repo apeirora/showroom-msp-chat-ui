@@ -44,17 +44,19 @@ type Config struct {
 	Source    accesspolicy.Source `json:"source"`
 	// The fields below are set only in password mode. They are omitted otherwise
 	// so the configuration of mapped instances stays byte-identical.
-	Mode           string `json:"mode,omitempty"`
-	PasswordSHA256 string `json:"passwordSHA256,omitempty"`
-	SessionKey     string `json:"sessionKey,omitempty"`
-	Identity       string `json:"identity,omitempty"`
+	Mode               string `json:"mode,omitempty"`
+	PasswordVerifier   string `json:"passwordVerifier,omitempty"`
+	PasswordSalt       string `json:"passwordSalt,omitempty"`
+	PasswordIterations int    `json:"passwordIterations,omitempty"`
+	SessionKey         string `json:"sessionKey,omitempty"`
+	Identity           string `json:"identity,omitempty"`
 }
 
 func (c Config) Validate() error {
 	if c.Mode == ModePassword {
 		return c.validatePassword()
 	}
-	if c.Mode != "" || c.PasswordSHA256 != "" || c.SessionKey != "" || c.Identity != "" {
+	if c.Mode != "" || c.PasswordVerifier != "" || c.PasswordSalt != "" || c.PasswordIterations != 0 || c.SessionKey != "" || c.Identity != "" {
 		return errors.New("unknown access mode or unexpected password configuration")
 	}
 	for _, endpoint := range []string{c.KCPServer, c.PublicURL} {

@@ -2,8 +2,7 @@ package controller
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"sort"
@@ -101,10 +100,12 @@ func TestUnmappedInstanceGetsGeneratedPassword(t *testing.T) {
 		t.Fatalf("password bundle carries OIDC material: %d keys", len(bundle.Data))
 	}
 	config := gateConfig(t, bundle)
-	digest := sha256.Sum256([]byte(password))
-	if config.Mode != accessgate.ModePassword || config.PasswordSHA256 != hex.EncodeToString(digest[:]) ||
+	salt, _ := base64.StdEncoding.DecodeString(config.PasswordSalt)
+	want, err := accessgate.PasswordVerifier(password, salt, accessgate.PasswordIterations)
+	if err != nil || config.Mode != accessgate.ModePassword || config.PasswordIterations != accessgate.PasswordIterations ||
+		config.PasswordVerifier != base64.StdEncoding.EncodeToString(want) ||
 		config.PublicURL != inst.Status.URL || strings.Contains(string(bundle.Data["gate.json"]), password) {
-		t.Fatal("gate configuration does not bind the digest of this instance's password")
+		t.Fatal("gate configuration does not bind the verifier of this instance's password")
 	}
 
 	// A second reconciliation changes nothing.
@@ -180,8 +181,8 @@ func TestPasswordsAndIdentitiesAreSeparatePerInstance(t *testing.T) {
 		configs[inst.Namespace] = gateConfig(t, readSecretData(t, r, inst.Namespace, bundle.name))
 	}
 	x, y := configs["tenant-a"], configs["tenant-b"]
-	if x.PasswordSHA256 == y.PasswordSHA256 || x.SessionKey == y.SessionKey || x.Identity == y.Identity {
-		t.Fatal("instances share password, session key or application identity")
+	if x.PasswordVerifier == y.PasswordVerifier || x.PasswordSalt == y.PasswordSalt || x.SessionKey == y.SessionKey || x.Identity == y.Identity {
+		t.Fatal("instances share password, salt, session key or application identity")
 	}
 }
 

@@ -2,11 +2,11 @@ package accessgate
 
 import (
 	"crypto/hmac"
+	"crypto/pbkdf2"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"net/http"
 	"regexp"
@@ -31,7 +31,24 @@ const (
 	loginFailureWindow      = time.Minute
 	maxLoginBody            = 4 << 10
 	sessionContext          = "chatui-password-session\x00"
+
+	// PasswordIterations is the PBKDF2-HMAC-SHA256 work factor recommended by OWASP.
+	PasswordIterations     = 600_000
+	PasswordSaltLength     = 16
+	passwordVerifierLength = 32
 )
+
+// minPasswordIterations is lowered only by tests.
+var minPasswordIterations = PasswordIterations
+
+// PasswordVerifier derives what the pod stores instead of the password. The
+// operator and the access proxy derive it identically.
+func PasswordVerifier(password string, salt []byte, iterations int) ([]byte, error) {
+	if len(salt) != PasswordSaltLength || iterations < 1 {
+		return nil, errors.New("password verifier requires a 16-byte salt and a positive work factor")
+	}
+	return pbkdf2.Key(sha256.New, password, salt, iterations, passwordVerifierLength)
+}
 
 var passwordIdentity = regexp.MustCompile(`^[a-f0-9]{64}@chatui\.invalid$`)
 
@@ -42,8 +59,14 @@ func (c Config) validatePassword() error {
 	if c.KCPServer != "" || c.KCPCA != "" || c.Issuer != "" || c.ClientID != "" || c.Source != (accesspolicy.Source{}) {
 		return errors.New("password access takes no sign-in provider or source configuration")
 	}
-	if digest, err := hex.DecodeString(c.PasswordSHA256); err != nil || len(digest) != sha256.Size {
-		return errors.New("password access requires a SHA-256 password digest")
+	if verifier, err := base64.StdEncoding.DecodeString(c.PasswordVerifier); err != nil || len(verifier) != passwordVerifierLength {
+		return errors.New("password access requires a PBKDF2 password verifier")
+	}
+	if salt, err := base64.StdEncoding.DecodeString(c.PasswordSalt); err != nil || len(salt) != PasswordSaltLength {
+		return errors.New("password access requires a 16-byte verifier salt")
+	}
+	if c.PasswordIterations < minPasswordIterations || c.PasswordIterations > 10_000_000 {
+		return errors.New("password access requires a supported verifier work factor")
 	}
 	if key, err := base64.StdEncoding.DecodeString(c.SessionKey); err != nil || len(key) != 32 {
 		return errors.New("password access requires a 32-byte session key")
@@ -54,13 +77,14 @@ func (c Config) validatePassword() error {
 	return nil
 }
 
-// passwordAccess holds only a digest of the generated password. The password has
-// 256 bits of entropy, so a plain digest compared in constant time is sufficient.
+// passwordAccess holds only a PBKDF2 verifier of the generated password.
 type passwordAccess struct {
-	digest   []byte
-	key      []byte
-	identity string
-	now      func() time.Time
+	verifier   []byte
+	salt       []byte
+	iterations int
+	key        []byte
+	identity   string
+	now        func() time.Time
 
 	mu          sync.Mutex
 	windowStart time.Time
@@ -68,16 +92,17 @@ type passwordAccess struct {
 }
 
 func newPasswordAccess(c Config) *passwordAccess {
-	digest, _ := hex.DecodeString(c.PasswordSHA256)
+	verifier, _ := base64.StdEncoding.DecodeString(c.PasswordVerifier)
+	salt, _ := base64.StdEncoding.DecodeString(c.PasswordSalt)
 	key, _ := base64.StdEncoding.DecodeString(c.SessionKey)
-	return &passwordAccess{digest: digest, key: key, identity: c.Identity, now: time.Now}
+	return &passwordAccess{verifier: verifier, salt: salt, iterations: c.PasswordIterations, key: key, identity: c.Identity, now: time.Now}
 }
 
 func (p *passwordAccess) mac(expiry []byte) []byte {
-	// Binding the digest invalidates every session if the password is replaced.
+	// Binding the verifier invalidates every session if the password is replaced.
 	m := hmac.New(sha256.New, p.key)
 	m.Write([]byte(sessionContext))
-	m.Write(p.digest)
+	m.Write(p.verifier)
 	m.Write(expiry)
 	return m.Sum(nil)
 }
@@ -117,9 +142,12 @@ func (p *passwordAccess) session(r *http.Request) (time.Time, bool) {
 
 // The limit is per instance, not per client: the password is shared and the
 // client address is not trustworthy here. Existing sessions are unaffected.
-// Admission, comparison and failure recording happen in one critical section,
-// so concurrent attempts cannot exceed the limit between check and record.
-func (p *passwordAccess) attempt(supplied []byte) (ok, limited bool) {
+//
+// reserve admits one attempt and counts it as a failure before the verifier is
+// derived; release takes it back after a correct password. Counting first means
+// concurrent attempts cannot exceed the limit, and it bounds the CPU that an
+// unauthenticated caller can spend on the derivation.
+func (p *passwordAccess) reserve() (time.Time, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	now := p.now()
@@ -127,13 +155,18 @@ func (p *passwordAccess) attempt(supplied []byte) (ok, limited bool) {
 		p.windowStart, p.failures = now, 0
 	}
 	if p.failures >= loginFailureLimit {
-		return false, true
-	}
-	if subtle.ConstantTimeCompare(supplied, p.digest) == 1 {
-		return true, false
+		return time.Time{}, false
 	}
 	p.failures++
-	return false, false
+	return p.windowStart, true
+}
+
+func (p *passwordAccess) release(window time.Time) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.windowStart.Equal(window) && p.failures > 0 {
+		p.failures--
+	}
 }
 
 func (p *passwordAccess) setCookie(w http.ResponseWriter, value string, maxAge int) {
@@ -155,23 +188,24 @@ func (p *passwordAccess) serve(w http.ResponseWriter, r *http.Request, route str
 		}
 		loginPage(w, http.StatusOK, "")
 	case http.MethodPost:
-		// Read the bounded form before taking the lock; never hold it during I/O.
+		// Read the bounded form before an attempt is admitted.
 		r.Body = http.MaxBytesReader(w, r.Body, maxLoginBody)
 		if err := r.ParseForm(); err != nil {
 			loginPage(w, http.StatusBadRequest, "The request could not be read.")
 			return
 		}
-		supplied := sha256.Sum256([]byte(r.PostForm.Get("password")))
-		ok, limited := p.attempt(supplied[:])
-		if limited {
+		window, admitted := p.reserve()
+		if !admitted {
 			w.Header().Set("Retry-After", strconv.Itoa(int(loginFailureWindow.Seconds())))
 			loginPage(w, http.StatusTooManyRequests, "Too many attempts. Try again in a minute.")
 			return
 		}
-		if !ok {
+		supplied, err := PasswordVerifier(r.PostForm.Get("password"), p.salt, p.iterations)
+		if err != nil || subtle.ConstantTimeCompare(supplied, p.verifier) != 1 {
 			loginPage(w, http.StatusUnauthorized, "That password is not correct.")
 			return
 		}
+		p.release(window)
 		p.setCookie(w, p.newSession(p.now().Add(PasswordSessionLifetime)), int(PasswordSessionLifetime.Seconds()))
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	default:

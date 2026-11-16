@@ -3,7 +3,6 @@ package accessgate
 import (
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -22,9 +21,19 @@ var fixtureIdentity = strings.Repeat("a", 64) + identityDomain
 
 const identityDomain = "@chatui.invalid"
 
+// Tests use a tiny work factor; production configuration is held to PasswordIterations.
+const testIterations = 4
+
+func init() { minPasswordIterations = testIterations }
+
 func passwordConfig(password string, keyByte byte) Config {
-	digest := sha256.Sum256([]byte(password))
-	return Config{Mode: ModePassword, PublicURL: "https://ui.example.test", PasswordSHA256: hex.EncodeToString(digest[:]),
+	salt := []byte(strings.Repeat("s", PasswordSaltLength))
+	verifier, err := PasswordVerifier(password, salt, testIterations)
+	if err != nil {
+		panic(err)
+	}
+	return Config{Mode: ModePassword, PublicURL: "https://ui.example.test", PasswordVerifier: base64.StdEncoding.EncodeToString(verifier),
+		PasswordSalt: base64.StdEncoding.EncodeToString(salt), PasswordIterations: testIterations,
 		SessionKey: base64.StdEncoding.EncodeToString([]byte(strings.Repeat(string(keyByte), 32))), Identity: fixtureIdentity}
 }
 
@@ -96,8 +105,11 @@ func TestPasswordConfigurationIsExclusiveAndComplete(t *testing.T) {
 		"provider mixed":   func(c *Config) { c.Issuer = "https://issuer.example.test/realm" },
 		"KCP mixed":        func(c *Config) { c.KCPServer = "https://kcp.example.test" },
 		"source mixed":     func(c *Config) { c.Source = accesspolicy.Source{Cluster: "account"} },
-		"missing digest":   func(c *Config) { c.PasswordSHA256 = "" },
-		"short digest":     func(c *Config) { c.PasswordSHA256 = "abcd" },
+		"missing verifier": func(c *Config) { c.PasswordVerifier = "" },
+		"short verifier":   func(c *Config) { c.PasswordVerifier = base64.StdEncoding.EncodeToString([]byte("short")) },
+		"missing salt":     func(c *Config) { c.PasswordSalt = "" },
+		"weak work factor": func(c *Config) { c.PasswordIterations = testIterations - 1 },
+		"huge work factor": func(c *Config) { c.PasswordIterations = 10_000_001 },
 		"short key":        func(c *Config) { c.SessionKey = base64.StdEncoding.EncodeToString([]byte("short")) },
 		"caller identity":  func(c *Config) { c.Identity = "alice@example.test" },
 		"missing identity": func(c *Config) { c.Identity = "" },
@@ -114,9 +126,32 @@ func TestPasswordConfigurationIsExclusiveAndComplete(t *testing.T) {
 	if err := oidc.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	oidc.PasswordSHA256 = passwordConfig(fixturePassword, 'k').PasswordSHA256
+	oidc.PasswordVerifier = passwordConfig(fixturePassword, 'k').PasswordVerifier
 	if oidc.Validate() == nil {
 		t.Fatal("OIDC configuration accepted password material")
+	}
+}
+
+func TestPasswordVerifierIsASlowSaltedDerivation(t *testing.T) {
+	if PasswordIterations < 600_000 {
+		t.Fatalf("production work factor is %d", PasswordIterations)
+	}
+	previous := minPasswordIterations
+	minPasswordIterations = PasswordIterations
+	defer func() { minPasswordIterations = previous }()
+	if passwordConfig(fixturePassword, 'k').Validate() == nil {
+		t.Fatal("production validation accepted a test work factor")
+	}
+	salt := []byte(strings.Repeat("s", PasswordSaltLength))
+	a, _ := PasswordVerifier(fixturePassword, salt, testIterations)
+	b, _ := PasswordVerifier(fixturePassword, []byte(strings.Repeat("t", PasswordSaltLength)), testIterations)
+	c, _ := PasswordVerifier(fixturePassword, salt, testIterations+1)
+	plain := sha256.Sum256([]byte(fixturePassword))
+	if len(a) != 32 || string(a) == string(b) || string(a) == string(c) || string(a) == string(plain[:]) {
+		t.Fatal("verifier does not depend on salt and work factor")
+	}
+	if _, err := PasswordVerifier(fixturePassword, []byte("short"), testIterations); err == nil {
+		t.Fatal("accepted a short salt")
 	}
 }
 

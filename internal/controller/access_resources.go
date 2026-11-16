@@ -12,6 +12,7 @@ import (
 	"maps"
 	"reflect"
 	"strings"
+	"sync"
 
 	uiapi "github.com/apeirora/showroom-msp-chat-ui/api/v1alpha1"
 	"github.com/apeirora/showroom-msp-chat-ui/internal/accessgate"
@@ -281,9 +282,30 @@ func (r *ChatUIInstanceReconciler) mappedAccessData(ctx context.Context, inst *u
 	return session, map[string][]byte{"gate.json": gate, "oauth.json": oauth, "client-secret": credential.Data["client_secret"], "cookie-secret": cookieSecret, "chatui_guard.py": webuiguard.Source}, nil
 }
 
+// loginVerifiers caches the PBKDF2 verifier per login Secret UID. The Secret is
+// immutable and UID-pinned, so its password cannot change under that key, and
+// the deliberately slow derivation runs once per instance and operator start
+// instead of on every reconciliation.
+var loginVerifiers sync.Map
+
+func loginVerifier(inst *uiapi.ChatUIInstance, login *corev1.Secret) (salt, verifier []byte, err error) {
+	// The salt only has to be unique per instance; it is not secret.
+	seed := sha256.Sum256([]byte("chatui-password-salt\x00" + string(inst.UID)))
+	salt = seed[:accessgate.PasswordSaltLength]
+	if cached, ok := loginVerifiers.Load(login.UID); ok {
+		return salt, cached.([]byte), nil
+	}
+	verifier, err = accessgate.PasswordVerifier(string(login.Data[loginPasswordKey]), salt, accessgate.PasswordIterations)
+	if err != nil {
+		return nil, nil, err
+	}
+	loginVerifiers.Store(login.UID, verifier)
+	return salt, verifier, nil
+}
+
 // passwordAccessData builds the bundle for an instance without a mapping. The
-// pod receives only a digest of the password; the password itself stays in the
-// login Secret that is published to the tenant.
+// pod receives only a PBKDF2 verifier of the password; the password itself
+// stays in the login Secret that is published to the tenant.
 func (r *ChatUIInstanceReconciler) passwordAccessData(ctx context.Context, inst *uiapi.ChatUIInstance, publicURL string) (*corev1.Secret, map[string][]byte, error) {
 	// The login Secret comes first: its pin marks the instance as password access
 	// before any other pin exists.
@@ -295,11 +317,16 @@ func (r *ChatUIInstanceReconciler) passwordAccessData(ctx context.Context, inst 
 	if err != nil {
 		return nil, nil, err
 	}
-	digest := sha256.Sum256(login.Data[loginPasswordKey])
+	salt, verifier, err := loginVerifier(inst, login)
+	if err != nil {
+		return nil, nil, err
+	}
 	// One fixed application identity per instance, derived only from the UID.
 	identity := sha256.Sum256([]byte("chatui-password\x00" + string(inst.UID)))
-	gate, err := json.Marshal(accessgate.Config{Mode: accessgate.ModePassword, PublicURL: publicURL, PasswordSHA256: hex.EncodeToString(digest[:]),
-		SessionKey: string(session.Data["cookie-secret"]), Identity: hex.EncodeToString(identity[:]) + "@chatui.invalid"})
+	gate, err := json.Marshal(accessgate.Config{Mode: accessgate.ModePassword, PublicURL: publicURL,
+		PasswordVerifier: base64.StdEncoding.EncodeToString(verifier), PasswordSalt: base64.StdEncoding.EncodeToString(salt),
+		PasswordIterations: accessgate.PasswordIterations,
+		SessionKey:         string(session.Data["cookie-secret"]), Identity: hex.EncodeToString(identity[:]) + "@chatui.invalid"})
 	if err != nil {
 		return nil, nil, err
 	}
