@@ -245,9 +245,9 @@ func oauthCookieSecret(encoded []byte) ([]byte, error) {
 	return []byte(base64.URLEncoding.EncodeToString(key)), nil
 }
 
-// mappedAccessData builds the bundle for an instance with a reviewed mapping:
+// mappedBundleData builds the bundle for an instance with a reviewed mapping:
 // OIDC proxy configuration plus the per-request KCP permission check.
-func (r *ChatUIInstanceReconciler) mappedAccessData(ctx context.Context, inst *uiapi.ChatUIInstance, e accesspolicy.Entry, publicURL string) (*corev1.Secret, map[string][]byte, error) {
+func (r *ChatUIInstanceReconciler) mappedBundleData(ctx context.Context, inst *uiapi.ChatUIInstance, e accesspolicy.Entry, publicURL string) (*corev1.Secret, map[string][]byte, error) {
 	if inst.Status.LoginSecretName != "" {
 		// A reviewed mapping replaces password access. Clear the marker first so a
 		// later removal of the mapping cannot fall back to the old password.
@@ -303,10 +303,10 @@ func loginVerifier(inst *uiapi.ChatUIInstance, login *corev1.Secret) (salt, veri
 	return salt, verifier, nil
 }
 
-// passwordAccessData builds the bundle for an instance without a mapping. The
-// pod receives only a PBKDF2 verifier of the password; the password itself
-// stays in the login Secret that is published to the tenant.
-func (r *ChatUIInstanceReconciler) passwordAccessData(ctx context.Context, inst *uiapi.ChatUIInstance, publicURL string) (*corev1.Secret, map[string][]byte, error) {
+// loginBundleData builds the bundle for an instance without a mapping. The
+// bundle carries no password: the pod receives only a PBKDF2 verifier, and the
+// password itself stays in the login Secret that is published to the tenant.
+func (r *ChatUIInstanceReconciler) loginBundleData(ctx context.Context, inst *uiapi.ChatUIInstance, publicURL string) (*corev1.Secret, map[string][]byte, error) {
 	// The login Secret comes first: its pin marks the instance as password access
 	// before any other pin exists.
 	login, err := r.loginSecret(ctx, inst)
@@ -351,9 +351,9 @@ func (r *ChatUIInstanceReconciler) prepareAccess(ctx context.Context, inst *uiap
 	var session *corev1.Secret
 	var data map[string][]byte
 	if password {
-		session, data, err = r.passwordAccessData(ctx, inst, publicURL)
+		session, data, err = r.loginBundleData(ctx, inst, publicURL)
 	} else {
-		session, data, err = r.mappedAccessData(ctx, inst, e, publicURL)
+		session, data, err = r.mappedBundleData(ctx, inst, e, publicURL)
 	}
 	if err != nil {
 		return nil, err
