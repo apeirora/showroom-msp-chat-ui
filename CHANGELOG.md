@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.1](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.16.0...v0.16.1) (2026-11-16)
+
+
+### Bug Fixes
+
+* **auth:** let the password sign-in form post carry its origin ([#186](https://github.com/apeirora/showroom-msp-chat-ui/issues/186)) ([7eb2341](https://github.com/apeirora/showroom-msp-chat-ui/commit/7eb2341e24e9ba938afb3bc1f15a368c88deb97f))
+
 ## [0.16.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.15.0...v0.16.0) (2026-11-16)
 
 
