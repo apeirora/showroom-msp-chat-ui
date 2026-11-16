@@ -16,13 +16,29 @@ spec:
   naming:
     namespace: {{ .Values.publishedResources.naming.namespace | quote }}
     name: "{{`{{ .Object.metadata.name }}`}}"
-{{- if .Values.publishedResources.credentialSecrets.enabled }}
+{{- $loginSecrets := (.Values.publishedResources.loginSecrets | default dict).enabled }}
+{{- if or .Values.publishedResources.credentialSecrets.enabled $loginSecrets }}
   related:
+{{- if .Values.publishedResources.credentialSecrets.enabled }}
     - identifier: credentials-secret
       origin: kcp
       kind: Secret
       object:
         reference:
           path: spec.credentialsSecretRef.name
+{{- end }}
+{{- if $loginSecrets }}
+    # Password access: publish the operator-generated login Secret into the
+    # account that owns the instance. The name comes from operator-written status,
+    # never from the tenant's spec. Resolved by template so that an instance
+    # without a login Secret renders an empty name and is skipped, on both sides.
+    - identifier: login-secret
+      origin: service
+      kind: Secret
+      cleanup: true
+      object:
+        template:
+          template: "{{`{{ with .Object.status }}{{ with .loginSecretName }}{{ . }}{{ end }}{{ end }}`}}"
+{{- end }}
 {{- end }}
 {{- end }}

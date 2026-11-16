@@ -57,6 +57,10 @@ chat-ui-sync-agent:
       namespace: 'chat-{{ printf "%s-%s" .ClusterName .Object.metadata.namespace | trunc 36 | trimAll "-." }}-{{ printf "%s/%s" .ClusterName .Object.metadata.namespace | sha3short }}'
     credentialSecrets:
       enabled: true
+    # Publishes the generated login Secret of instances that use password access
+    # (operator accessPolicy.passwordFallback). No effect for mapped instances.
+    loginSecrets:
+      enabled: true
 
 chat-ui-ui:
   enabled: false   # opt-in; bare operator is enough for the tutorial

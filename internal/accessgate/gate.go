@@ -1,5 +1,7 @@
-// Package accessgate authorizes each browser request against the exact KCP object.
-// It runs only on pod loopback, behind the session-verifying OIDC proxy.
+// Package accessgate authorizes each browser request before it reaches the application.
+// With a reviewed mapping it runs on pod loopback behind the session-verifying OIDC
+// proxy and checks the exact KCP object. In password mode it is the pod's only
+// listener and checks a per-instance password session instead.
 package accessgate
 
 import (
@@ -40,9 +42,21 @@ type Config struct {
 	Issuer    string              `json:"issuer"`
 	ClientID  string              `json:"clientID"`
 	Source    accesspolicy.Source `json:"source"`
+	// The fields below are set only in password mode. They are omitted otherwise
+	// so the configuration of mapped instances stays byte-identical.
+	Mode           string `json:"mode,omitempty"`
+	PasswordSHA256 string `json:"passwordSHA256,omitempty"`
+	SessionKey     string `json:"sessionKey,omitempty"`
+	Identity       string `json:"identity,omitempty"`
 }
 
 func (c Config) Validate() error {
+	if c.Mode == ModePassword {
+		return c.validatePassword()
+	}
+	if c.Mode != "" || c.PasswordSHA256 != "" || c.SessionKey != "" || c.Identity != "" {
+		return errors.New("unknown access mode or unexpected password configuration")
+	}
 	for _, endpoint := range []string{c.KCPServer, c.PublicURL} {
 		if err := accesspolicy.HTTPSURL(endpoint, true); err != nil {
 			return err
@@ -59,6 +73,7 @@ func (c Config) Validate() error {
 
 type Gate struct {
 	config          Config
+	password        *passwordAccess
 	kcp             *http.Client
 	application     *http.Client
 	proxy           *httputil.ReverseProxy
@@ -73,29 +88,36 @@ func newGate(c Config, upstream string) (*Gate, error) {
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}
-	roots := x509.NewCertPool()
-	if c.KCPCA != "" {
-		if !roots.AppendCertsFromPEM([]byte(c.KCPCA)) {
-			return nil, errors.New("invalid KCP CA")
-		}
+	noRedirect := func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	var kcp *http.Client
+	var password *passwordAccess
+	if c.Mode == ModePassword {
+		password = newPasswordAccess(c)
 	} else {
-		var err error
-		roots, err = x509.SystemCertPool()
-		if err != nil {
-			return nil, errors.New("system trust store unavailable")
+		roots := x509.NewCertPool()
+		if c.KCPCA != "" {
+			if !roots.AppendCertsFromPEM([]byte(c.KCPCA)) {
+				return nil, errors.New("invalid KCP CA")
+			}
+		} else {
+			var err error
+			roots, err = x509.SystemCertPool()
+			if err != nil {
+				return nil, errors.New("system trust store unavailable")
+			}
 		}
+		transport := &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: roots},
+			DialContext: (&net.Dialer{Timeout: 5 * time.Second}).DialContext, TLSHandshakeTimeout: 5 * time.Second,
+			ResponseHeaderTimeout: 5 * time.Second, IdleConnTimeout: 30 * time.Second, MaxIdleConnsPerHost: 16}
+		kcp = &http.Client{Transport: transport, Timeout: 5 * time.Second, CheckRedirect: noRedirect}
 	}
-	transport := &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: roots},
-		DialContext: (&net.Dialer{Timeout: 5 * time.Second}).DialContext, TLSHandshakeTimeout: 5 * time.Second,
-		ResponseHeaderTimeout: 5 * time.Second, IdleConnTimeout: 30 * time.Second, MaxIdleConnsPerHost: 16}
 	target, err := url.Parse(upstream)
 	if err != nil {
 		return nil, err
 	}
 	public, _ := url.Parse(c.PublicURL)
-	noRedirect := func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	g := &Gate{config: c, host: public.Host, upstream: target, recheckInterval: PermissionRecheckInterval,
-		kcp:         &http.Client{Transport: transport, Timeout: 5 * time.Second, CheckRedirect: noRedirect},
+		password: password, kcp: kcp,
 		application: &http.Client{Transport: &http.Transport{Proxy: nil}, Timeout: 3 * time.Second, CheckRedirect: noRedirect}}
 	g.proxy = &httputil.ReverseProxy{
 		Rewrite: func(p *httputil.ProxyRequest) {
@@ -226,6 +248,12 @@ func (g *Gate) oidcIdentity(token string) (string, time.Time, error) {
 
 func (g *Gate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
+	// In password mode this is the pod's listener, so the platform's readiness
+	// probe arrives here without the public host name.
+	if g.password != nil && r.URL.Path == PingPath {
+		servePing(w, r)
+		return
+	}
 	if r.Host != g.host {
 		http.Error(w, "Invalid host", http.StatusBadRequest)
 		return
@@ -245,6 +273,10 @@ func (g *Gate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Trusted-header signin is the only credential-creation path. Deny local
 	// password, API-key, LDAP, administrator and OAuth-token exchange endpoints.
 	p := path.Clean(r.URL.Path)
+	if g.password != nil && (p == LoginPath || p == LogoutPath) {
+		g.password.serve(w, r, p)
+		return
+	}
 	// Only Socket.IO has message-token identity binding in the pinned guard.
 	// Terminal and realtime-audio WebSockets use independent first-message JWTs.
 	if upgrade && p != "/ws/socket.io" {
@@ -255,6 +287,29 @@ func (g *Gate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Authentication managed by the platform", http.StatusForbidden)
 		return
 	}
+	if g.password != nil {
+		g.servePassword(w, r, upgrade)
+		return
+	}
+	g.serveMapped(w, r)
+}
+
+// servePassword forwards a request that carries this instance's password session.
+// There is no user token to recheck. A running stream or socket still never
+// outlives the session that established it.
+func (g *Gate) servePassword(w http.ResponseWriter, r *http.Request, upgrade bool) {
+	expires, ok := g.password.session(r)
+	if !ok {
+		g.password.challenge(w, r, upgrade)
+		return
+	}
+	ctx, cancel := context.WithDeadline(context.WithValue(r.Context(), identityKey{}, g.password.identity), expires)
+	defer cancel()
+	g.proxy.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// serveMapped forwards a request whose OIDC token KCP accepts for the exact instance.
+func (g *Gate) serveMapped(w http.ResponseWriter, r *http.Request) {
 	values := r.Header.Values(TokenHeader)
 	if len(values) != 1 {
 		http.Error(w, "Sign in required", http.StatusUnauthorized)

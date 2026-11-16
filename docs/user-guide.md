@@ -103,6 +103,24 @@ Consumers must require `Ready=True` for the current generation as well as the sl
 See [hostname ownership and migration](hostname-policy.md). Access authentication
 is a separate requirement; a unique URL does not restrict who may use the UI.
 
+### Signing in
+
+How you sign in depends on how the platform has set up your instance:
+
+- **Organization login.** The URL redirects to your organization's login. You need
+  `get` permission on the ChatUIInstance in your account.
+- **Instance password.** The URL shows a password form. The password is in the
+  Secret named in `status.loginSecretName` (shown as **Login Secret** in the portal
+  detail view), in the same namespace as the instance:
+
+  ```bash
+  SECRET=$(kubectl get chatuiinstance my-chat -o jsonpath='{.status.loginSecretName}')
+  kubectl get secret "$SECRET" -o jsonpath='{.data.password}' | base64 -d
+  ```
+
+  Everyone who has the password shares one chat history. The password does not
+  change; delete and recreate the instance to get a new one.
+
 ## Scaling
 
 Change the replica count:

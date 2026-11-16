@@ -55,6 +55,10 @@ type ChatUIInstanceStatus struct {
 	// Recreated Secrets are not adopted.
 	AccessSecretUIDs map[string]string `json:"accessSecretUIDs,omitempty"`
 
+	// LoginSecretName names the operator-generated Secret holding the instance
+	// password. It is set only while the instance uses password access.
+	LoginSecretName string `json:"loginSecretName,omitempty"`
+
 	// Phase is a high-level summary of the instance lifecycle (e.g., "Ready").
 	Phase string `json:"phase,omitempty"`
 
