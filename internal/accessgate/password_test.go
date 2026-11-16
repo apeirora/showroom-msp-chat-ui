@@ -322,6 +322,27 @@ func TestPasswordLoginRejectsCrossSiteOversizedAndOtherMethods(t *testing.T) {
 	}
 }
 
+// A browser derives the Origin header of a form post from the referrer policy of
+// the page that holds the form: under no-referrer it sends "Origin: null", which
+// the gate refuses like any foreign origin. The sign-in page therefore has to
+// keep a policy under which its own post carries its origin.
+func TestPasswordLoginPageLetsItsOwnFormPostCarryItsOrigin(t *testing.T) {
+	f := newPasswordFixture(t)
+	for _, page := range []*httptest.ResponseRecorder{
+		f.do(passwordRequest(http.MethodGet, LoginPath)),
+		f.do(loginRequest("not the password")),
+	} {
+		if got := page.Header().Get("Referrer-Policy"); got != "same-origin" {
+			t.Fatalf("sign-in page with status %d has Referrer-Policy %q", page.Code, got)
+		}
+	}
+	opaque := loginRequest(fixturePassword)
+	opaque.Header.Set("Origin", "null")
+	if w := f.do(opaque); w.Code != http.StatusForbidden || sessionCookie(t, w) != nil {
+		t.Fatalf("opaque origin: %d", w.Code)
+	}
+}
+
 func TestPasswordModeKeepsNativeCredentialAndSocketRestrictions(t *testing.T) {
 	f := newPasswordFixture(t)
 	cookie := &http.Cookie{Name: CookieName, Value: f.gate.password.newSession(time.Now().Add(time.Hour))}

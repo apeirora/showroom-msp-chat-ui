@@ -239,7 +239,10 @@ func loginPage(w http.ResponseWriter, status int, message string) {
 	h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("X-Frame-Options", "DENY")
-	h.Set("Referrer-Policy", "no-referrer")
+	// Not no-referrer: under that policy a browser sends "Origin: null" with this
+	// page's own form post, and the gate refuses every origin but its own. With
+	// same-origin the post carries the real origin and nothing leaves the site.
+	h.Set("Referrer-Policy", "same-origin")
 	w.WriteHeader(status)
 	if message != "" {
 		message = `<p role="alert">` + message + `</p>`
