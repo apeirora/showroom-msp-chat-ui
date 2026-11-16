@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.15.0...v0.16.0) (2026-11-16)
+
+
+### Features
+
+* **portal:** Show the instance password in a Login Secrets view ([#184](https://github.com/apeirora/showroom-msp-chat-ui/issues/184)) ([f951437](https://github.com/apeirora/showroom-msp-chat-ui/commit/f9514370875ddb0dcc5e858bfa966f6994387aba))
+
 ## [0.15.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.14.5...v0.15.0) (2026-11-16)
 
 
