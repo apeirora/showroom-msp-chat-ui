@@ -150,6 +150,47 @@ original ID token expires; a reconnect obtains a refreshed session. The applicat
 JWT lasts one hour. There is a KCP GET per request plus periodic checks on active
 streams; size and monitor KCP capacity before rollout.
 
+### Password access for unmapped instances
+
+`passwordFallback: true` gives an instance **without** a reviewed mapping a generated
+password instead of `AccessNotConfigured`. It is off by default and cannot be combined
+with `enrollment`. Mapped instances are not affected: their bundle, pod and sign-in
+stay exactly as described above.
+
+```yaml
+accessPolicy:
+  passwordFallback: true
+```
+
+A password instance differs from a mapped one in these points:
+
+- The pod has two containers. The access proxy listens on 8080 itself, serves the
+  sign-in form at `/_chatui/login` and issues the session cookie; no OAuth2 Proxy
+  runs. Open WebUI, the guard and every restriction on native credentials, origins
+  and WebSocket routes are unchanged.
+- The password is 32 random bytes in the immutable Secret `chatui-login-<hash>`,
+  owned by the instance and pinned by UID like the session key. The pod receives
+  only a PBKDF2-HMAC-SHA256 verifier of it (600,000 iterations). `status.loginSecretName` names the Secret, and the sync
+  agent publishes it into the account that owns the instance
+  (`publishedResources.loginSecrets.enabled`). Set `loginSecrets.cleanup: true` to
+  remove that copy when the instance is deleted; it needs api-syncagent v0.7.0 or
+  newer and is off by default.
+- Everyone who signs in shares one application identity derived from the instance
+  UID, and therefore one chat history.
+- There is **no per-request KCP permission check**. Whoever can read the Secret in
+  the account can use the instance for as long as it exists; a session lasts eight
+  hours. Losing access to the account does not end access to the instance.
+- The password is not rotated. To replace it, delete and recreate the instance.
+- Sign-in attempts are limited to ten failures per minute per instance.
+
+The mode is chosen once. An instance that ever held a mapped sign-in bundle never
+falls back to a password, so removing a mapping still ends in `AccessNotConfigured`.
+Adding a reviewed mapping for a password instance moves it to per-user sign-in and
+clears `status.loginSecretName`; the old password is not accepted again afterwards.
+
+Roll out the operator, CRD and access-proxy image of the same release together:
+the access proxy of an older release does not accept a password configuration.
+
 ### Secret identity and recovery
 
 Session signing keys are independently generated from cryptographic randomness.

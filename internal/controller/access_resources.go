@@ -12,6 +12,7 @@ import (
 	"maps"
 	"reflect"
 	"strings"
+	"sync"
 
 	uiapi "github.com/apeirora/showroom-msp-chat-ui/api/v1alpha1"
 	"github.com/apeirora/showroom-msp-chat-ui/internal/accessgate"
@@ -29,7 +30,21 @@ import (
 
 const accessRevisionAnnotation = "ui.privatellms.msp/access-revision"
 
-type accessBundle struct{ name, sessionName, revision, publicURL string }
+const (
+	loginPasswordKey    = "password"
+	loginPasswordLength = 43 // 32 random bytes, unpadded URL-safe base64
+	loginSecretLabel    = "ui.privatellms.msp/login-secret"
+)
+
+// Operator-created Secret names that tenant backend credentials must not claim.
+var reservedSecretPrefixes = []string{"chatui-session-", "chatui-access-", "chatui-login-"}
+
+type accessBundle struct {
+	name, sessionName, revision, publicURL string
+	// password is true when the gate authenticates the browser itself and no
+	// OIDC proxy runs in the pod.
+	password bool
+}
 
 func uidHash(value string) string {
 	digest := sha256.Sum256([]byte(value))
@@ -38,6 +53,10 @@ func uidHash(value string) string {
 
 func sessionSecretName(inst *uiapi.ChatUIInstance) string {
 	return "chatui-session-" + uidHash(string(inst.UID))
+}
+
+func loginSecretName(inst *uiapi.ChatUIInstance) string {
+	return "chatui-login-" + uidHash(string(inst.UID))
 }
 
 func ownedByInstance(object metav1.Object, inst *uiapi.ChatUIInstance) bool {
@@ -87,10 +106,67 @@ func (r *ChatUIInstanceReconciler) sessionSecret(ctx context.Context, inst *uiap
 	return &secret, nil
 }
 
+// passwordAccess reports whether an instance without a reviewed mapping may use
+// the generated password. An instance that ever held a mapped sign-in bundle is
+// excluded, so removing a mapping never replaces per-user sign-in silently.
+func (r *ChatUIInstanceReconciler) passwordAccess(inst *uiapi.ChatUIInstance) bool {
+	if r.AccessPolicy == nil || !r.AccessPolicy.PasswordFallback {
+		return false
+	}
+	name := loginSecretName(inst)
+	if inst.Status.LoginSecretName == "" {
+		return len(inst.Status.AccessSecretUIDs) == 0
+	}
+	return inst.Status.LoginSecretName == name && inst.Status.AccessSecretUIDs[name] != ""
+}
+
+// loginSecret returns the generated instance password. Like the session key it
+// is created once, immutable and pinned by UID; a recreated Secret is not adopted.
+// The pin and status.loginSecretName are written in one patch, so an instance is
+// either unmarked or fully recorded as using password access.
+func (r *ChatUIInstanceReconciler) loginSecret(ctx context.Context, inst *uiapi.ChatUIInstance) (*corev1.Secret, error) {
+	var secret corev1.Secret
+	key := client.ObjectKey{Namespace: inst.Namespace, Name: loginSecretName(inst)}
+	if err := r.routeReader().Get(ctx, key, &secret); err == nil {
+		if !ownedByInstance(&secret, inst) || secret.Immutable == nil || !*secret.Immutable || secret.DeletionTimestamp != nil ||
+			secret.UID == "" || inst.Status.AccessSecretUIDs[secret.Name] != string(secret.UID) ||
+			len(secret.Data[loginPasswordKey]) != loginPasswordLength {
+			return nil, errors.New("login Secret ownership, immutability or content mismatch")
+		}
+		return &secret, nil
+	} else if !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+	if inst.Status.AccessSecretUIDs[key.Name] != "" {
+		return nil, errors.New("pinned login Secret is missing; operator recovery required")
+	}
+	random := make([]byte, 32)
+	if _, err := rand.Read(random); err != nil {
+		return nil, errors.New("login entropy unavailable")
+	}
+	secret = corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace, Labels: map[string]string{loginSecretLabel: "true"}},
+		Type: corev1.SecretTypeOpaque, Immutable: ptrTo(true),
+		Data: map[string][]byte{loginPasswordKey: []byte(base64.RawURLEncoding.EncodeToString(random))}}
+	if err := ctrl.SetControllerReference(inst, &secret, r.Scheme); err != nil {
+		return nil, err
+	}
+	if err := r.Create(ctx, &secret); err != nil {
+		return nil, err
+	}
+	if err := r.pinSecret(ctx, inst, &secret, secret.Name); err != nil {
+		return nil, err
+	}
+	return &secret, nil
+}
+
 // Only the result of our successful Create may establish a pin. A crash before
 // persistence leaves an untrusted orphan and requires explicit operator recovery.
 // Read back a fresh object: older CRDs must not silently prune this boundary.
 func (r *ChatUIInstanceReconciler) pinAccessSecret(ctx context.Context, inst *uiapi.ChatUIInstance, secret *corev1.Secret) error {
+	return r.pinSecret(ctx, inst, secret, inst.Status.LoginSecretName)
+}
+
+func (r *ChatUIInstanceReconciler) pinSecret(ctx context.Context, inst *uiapi.ChatUIInstance, secret *corev1.Secret, login string) error {
 	if secret.UID == "" {
 		return errors.New("API server did not assign an access Secret UID")
 	}
@@ -99,15 +175,25 @@ func (r *ChatUIInstanceReconciler) pinAccessSecret(ctx context.Context, inst *ui
 		pins = make(map[string]string)
 	}
 	pins[secret.Name] = string(secret.UID)
-	if len(pins) > maxAccessBundles+1 {
+	// The session key and the login Secret are permanent pins outside the bundle limit.
+	limit := maxAccessBundles + 1
+	if pins[loginSecretName(inst)] != "" {
+		limit++
+	}
+	if len(pins) > limit {
 		return errors.New("access Secret history is full")
 	}
-	return r.persistAccessSecretPins(ctx, inst, pins)
+	return r.persistAccessState(ctx, inst, pins, login)
 }
 
 func (r *ChatUIInstanceReconciler) persistAccessSecretPins(ctx context.Context, inst *uiapi.ChatUIInstance, pins map[string]string) error {
+	return r.persistAccessState(ctx, inst, pins, inst.Status.LoginSecretName)
+}
+
+func (r *ChatUIInstanceReconciler) persistAccessState(ctx context.Context, inst *uiapi.ChatUIInstance, pins map[string]string, login string) error {
 	updated := inst.DeepCopy()
 	updated.Status.AccessSecretUIDs = pins
+	updated.Status.LoginSecretName = login
 	if err := r.Status().Patch(ctx, updated, client.MergeFromWithOptions(inst, client.MergeFromWithOptimisticLock{})); err != nil {
 		return err
 	}
@@ -115,8 +201,8 @@ func (r *ChatUIInstanceReconciler) persistAccessSecretPins(ctx context.Context, 
 	if err := r.routeReader().Get(ctx, client.ObjectKeyFromObject(inst), &persisted); err != nil {
 		return err
 	}
-	if !reflect.DeepEqual(persisted.Status.AccessSecretUIDs, pins) {
-		return errors.New("ChatUIInstance schema must persist access Secret UID pins")
+	if !reflect.DeepEqual(persisted.Status.AccessSecretUIDs, pins) || persisted.Status.LoginSecretName != login {
+		return errors.New("ChatUIInstance schema must persist access Secret UID pins and the login Secret name")
 	}
 	*inst = persisted
 	return nil
@@ -159,43 +245,119 @@ func oauthCookieSecret(encoded []byte) ([]byte, error) {
 	return []byte(base64.URLEncoding.EncodeToString(key)), nil
 }
 
+// mappedBundleData builds the bundle for an instance with a reviewed mapping:
+// OIDC proxy configuration plus the per-request KCP permission check.
+func (r *ChatUIInstanceReconciler) mappedBundleData(ctx context.Context, inst *uiapi.ChatUIInstance, e accesspolicy.Entry, publicURL string) (*corev1.Secret, map[string][]byte, error) {
+	if inst.Status.LoginSecretName != "" {
+		// A reviewed mapping replaces password access. Clear the marker first so a
+		// later removal of the mapping cannot fall back to the old password.
+		if err := r.persistAccessState(ctx, inst, maps.Clone(inst.Status.AccessSecretUIDs), ""); err != nil {
+			return nil, nil, err
+		}
+	}
+	var credential corev1.Secret
+	if err := r.routeReader().Get(ctx, client.ObjectKey{Namespace: r.AccessPolicy.CredentialsNamespace, Name: e.ClientSecretName}, &credential); err != nil {
+		return nil, nil, errors.New("OIDC client credential unavailable")
+	}
+	if len(credential.Data["client_secret"]) < 16 {
+		return nil, nil, errors.New("OIDC client credential is missing or too short")
+	}
+	session, err := r.sessionSecret(ctx, inst)
+	if err != nil {
+		return nil, nil, err
+	}
+	cookieSecret, err := oauthCookieSecret(session.Data["cookie-secret"])
+	if err != nil {
+		return nil, nil, err
+	}
+	gate, err := json.Marshal(accessgate.Config{KCPServer: r.AccessPolicy.KCPServer, KCPCA: r.AccessPolicy.KCPCA, PublicURL: publicURL,
+		Issuer: e.Issuer, ClientID: e.ClientID, Source: e.Source})
+	if err != nil {
+		return nil, nil, err
+	}
+	oauth, err := oauthConfiguration(e)
+	if err != nil {
+		return nil, nil, err
+	}
+	return session, map[string][]byte{"gate.json": gate, "oauth.json": oauth, "client-secret": credential.Data["client_secret"], "cookie-secret": cookieSecret, "chatui_guard.py": webuiguard.Source}, nil
+}
+
+// loginVerifiers caches the PBKDF2 verifier per login Secret UID. The Secret is
+// immutable and UID-pinned, so its password cannot change under that key, and
+// the deliberately slow derivation runs once per instance and operator start
+// instead of on every reconciliation.
+var loginVerifiers sync.Map
+
+func loginVerifier(inst *uiapi.ChatUIInstance, login *corev1.Secret) (salt, verifier []byte, err error) {
+	// The salt only has to be unique per instance; it is not secret.
+	seed := sha256.Sum256([]byte("chatui-password-salt\x00" + string(inst.UID)))
+	salt = seed[:accessgate.PasswordSaltLength]
+	if cached, ok := loginVerifiers.Load(login.UID); ok {
+		return salt, cached.([]byte), nil
+	}
+	verifier, err = accessgate.PasswordVerifier(string(login.Data[loginPasswordKey]), salt, accessgate.PasswordIterations)
+	if err != nil {
+		return nil, nil, err
+	}
+	loginVerifiers.Store(login.UID, verifier)
+	return salt, verifier, nil
+}
+
+// loginBundleData builds the bundle for an instance without a mapping. The
+// bundle carries no password: the pod receives only a PBKDF2 verifier, and the
+// password itself stays in the login Secret that is published to the tenant.
+func (r *ChatUIInstanceReconciler) loginBundleData(ctx context.Context, inst *uiapi.ChatUIInstance, publicURL string) (*corev1.Secret, map[string][]byte, error) {
+	// The login Secret comes first: its pin marks the instance as password access
+	// before any other pin exists.
+	login, err := r.loginSecret(ctx, inst)
+	if err != nil {
+		return nil, nil, err
+	}
+	session, err := r.sessionSecret(ctx, inst)
+	if err != nil {
+		return nil, nil, err
+	}
+	salt, verifier, err := loginVerifier(inst, login)
+	if err != nil {
+		return nil, nil, err
+	}
+	// One fixed application identity per instance, derived only from the UID.
+	identity := sha256.Sum256([]byte("chatui-password\x00" + string(inst.UID)))
+	gate, err := json.Marshal(accessgate.Config{Mode: accessgate.ModePassword, PublicURL: publicURL,
+		PasswordVerifier: base64.StdEncoding.EncodeToString(verifier), PasswordSalt: base64.StdEncoding.EncodeToString(salt),
+		PasswordIterations: accessgate.PasswordIterations,
+		SessionKey:         string(session.Data["cookie-secret"]), Identity: hex.EncodeToString(identity[:]) + "@chatui.invalid"})
+	if err != nil {
+		return nil, nil, err
+	}
+	return session, map[string][]byte{"gate.json": gate, "chatui_guard.py": webuiguard.Source}, nil
+}
+
 func (r *ChatUIInstanceReconciler) prepareAccess(ctx context.Context, inst *uiapi.ChatUIInstance, host string) (*accessBundle, error) {
 	e, err := r.selectAccessEntry(ctx, inst)
-	if err != nil {
+	password := errors.Is(err, accesspolicy.ErrUnmapped) && r.passwordAccess(inst)
+	if err != nil && !password {
 		return nil, err
 	}
 	if r.PublicScheme != "https" || r.AccessPolicy.CredentialsNamespace == inst.Namespace {
 		return nil, errors.New("HTTPS and isolated operator credential namespace are required")
 	}
-	if strings.HasPrefix(inst.Spec.CredentialsSecretRef.Name, "chatui-session-") || strings.HasPrefix(inst.Spec.CredentialsSecretRef.Name, "chatui-access-") {
-		return nil, errors.New("backend credentials reference a reserved access Secret name")
-	}
-	var credential corev1.Secret
-	if err := r.routeReader().Get(ctx, client.ObjectKey{Namespace: r.AccessPolicy.CredentialsNamespace, Name: e.ClientSecretName}, &credential); err != nil {
-		return nil, errors.New("OIDC client credential unavailable")
-	}
-	if len(credential.Data["client_secret"]) < 16 {
-		return nil, errors.New("OIDC client credential is missing or too short")
-	}
-	session, err := r.sessionSecret(ctx, inst)
-	if err != nil {
-		return nil, err
-	}
-	cookieSecret, err := oauthCookieSecret(session.Data["cookie-secret"])
-	if err != nil {
-		return nil, err
+	for _, prefix := range reservedSecretPrefixes {
+		if strings.HasPrefix(inst.Spec.CredentialsSecretRef.Name, prefix) {
+			return nil, errors.New("backend credentials reference a reserved access Secret name")
+		}
 	}
 	publicURL := "https://" + host
-	gate, err := json.Marshal(accessgate.Config{KCPServer: r.AccessPolicy.KCPServer, KCPCA: r.AccessPolicy.KCPCA, PublicURL: publicURL,
-		Issuer: e.Issuer, ClientID: e.ClientID, Source: e.Source})
+	var session *corev1.Secret
+	var data map[string][]byte
+	if password {
+		session, data, err = r.loginBundleData(ctx, inst, publicURL)
+	} else {
+		session, data, err = r.mappedBundleData(ctx, inst, e, publicURL)
+	}
 	if err != nil {
 		return nil, err
 	}
-	oauth, err := oauthConfiguration(e)
-	if err != nil {
-		return nil, err
-	}
-	data := map[string][]byte{"gate.json": gate, "oauth.json": oauth, "client-secret": credential.Data["client_secret"], "cookie-secret": cookieSecret, "chatui_guard.py": webuiguard.Source}
 	serialized, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
@@ -229,7 +391,7 @@ func (r *ChatUIInstanceReconciler) prepareAccess(ctx context.Context, inst *uiap
 			return nil, err
 		}
 	}
-	return &accessBundle{name: name, sessionName: session.Name, revision: revision, publicURL: publicURL}, nil
+	return &accessBundle{name: name, sessionName: session.Name, revision: revision, publicURL: publicURL, password: password}, nil
 }
 
 // withdrawAccess never removes another controller's object, including an Ingress
@@ -294,8 +456,12 @@ func applyAccessDeployment(deploy *appsv1.Deployment, inst *uiapi.ChatUIInstance
 	pod.Labels["ui.privatellms.msp/instance-uid"] = string(inst.UID)
 	pod.Spec.AutomountServiceAccountToken = ptrTo(false)
 	pod.Spec.SecurityContext = &corev1.PodSecurityContext{FSGroup: ptrTo(int64(1000)), SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}}
+	signOutPath := "/oauth2/sign_out"
+	if b.password {
+		signOutPath = accessgate.LogoutPath
+	}
 	app := &pod.Spec.Containers[0]
-	app.Ports = nil // Only OAuth2 Proxy listens on the pod interface.
+	app.Ports = nil // Only the access containers listen on the pod interface.
 	app.SecurityContext = &corev1.SecurityContext{RunAsNonRoot: ptrTo(true), RunAsUser: ptrTo(int64(1000)), RunAsGroup: ptrTo(int64(1000)),
 		AllowPrivilegeEscalation: ptrTo(false), Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}}}
 	app.Command = []string{"python", "-m", "uvicorn", "chatui_guard:app", "--app-dir=/etc/chat-ui-guard", "--host=127.0.0.1", "--port=8081", "--workers=1", "--forwarded-allow-ips=127.0.0.1"}
@@ -307,7 +473,7 @@ func applyAccessDeployment(deploy *appsv1.Deployment, inst *uiapi.ChatUIInstance
 		corev1.EnvVar{Name: "CORS_ALLOW_ORIGIN", Value: b.publicURL},
 		corev1.EnvVar{Name: "DEFAULT_USER_ROLE", Value: "user"}, corev1.EnvVar{Name: "WEBUI_AUTH_COOKIE_SECURE", Value: "true"},
 		corev1.EnvVar{Name: "ENABLE_INITIAL_ADMIN_SIGNUP", Value: "false"}, corev1.EnvVar{Name: "JWT_EXPIRES_IN", Value: "1h"},
-		corev1.EnvVar{Name: "WEBUI_AUTH_SIGNOUT_REDIRECT_URL", Value: "/oauth2/sign_out"})
+		corev1.EnvVar{Name: "WEBUI_AUTH_SIGNOUT_REDIRECT_URL", Value: signOutPath})
 	probe := &corev1.Probe{ProbeHandler: corev1.ProbeHandler{Exec: &corev1.ExecAction{Command: []string{"python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/health', timeout=2)"}}}, PeriodSeconds: 10, TimeoutSeconds: 3, FailureThreshold: 6}
 	app.ReadinessProbe = probe.DeepCopy()
 	app.LivenessProbe = probe.DeepCopy()
@@ -325,19 +491,28 @@ func applyAccessDeployment(deploy *appsv1.Deployment, inst *uiapi.ChatUIInstance
 	gate.StartupProbe = gate.LivenessProbe.DeepCopy()
 	gate.StartupProbe.PeriodSeconds = app.StartupProbe.PeriodSeconds
 	gate.StartupProbe.FailureThreshold = app.StartupProbe.FailureThreshold
-	oauth := corev1.Container{Name: "oauth2-proxy", Image: accesspolicy.OAuthImage, Args: oauthArguments(b.publicURL), SecurityContext: accessSecurityContext(),
-		Ports:          []corev1.ContainerPort{{Name: "http", ContainerPort: 8080}},
-		VolumeMounts:   []corev1.VolumeMount{{Name: "oauth-config", MountPath: "/etc/chat-ui-access", ReadOnly: true}},
-		ReadinessProbe: chatUIHTTPProbe(5, 6), LivenessProbe: chatUIHTTPProbe(10, 6)}
-	oauth.ReadinessProbe.HTTPGet.Path = "/ping"
-	oauth.LivenessProbe.HTTPGet.Path = "/ping"
-	pod.Spec.Containers = append(pod.Spec.Containers, gate, oauth)
-	pod.Spec.Volumes = []corev1.Volume{
-		{Name: "webui-guard", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: b.name, Items: []corev1.KeyToPath{{Key: "chatui_guard.py", Path: "chatui_guard.py"}}}}},
-		{Name: "gate-config", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: b.name, Items: []corev1.KeyToPath{{Key: "gate.json", Path: "gate.json"}}}}},
-		{Name: "oauth-config", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: b.name, Items: []corev1.KeyToPath{{Key: "oauth.json", Path: "oauth.json"}, {Key: "client-secret", Path: "client-secret"}, {Key: "cookie-secret", Path: "cookie-secret"}}}}},
+	guardVolume := corev1.Volume{Name: "webui-guard", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: b.name, Items: []corev1.KeyToPath{{Key: "chatui_guard.py", Path: "chatui_guard.py"}}}}}
+	gateVolume := corev1.Volume{Name: "gate-config", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: b.name, Items: []corev1.KeyToPath{{Key: "gate.json", Path: "gate.json"}}}}}
+	dataVolumes := []corev1.Volume{
 		{Name: "webui-data", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
 		{Name: "webui-tmp", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
+	}
+	if b.password {
+		// The gate authenticates the browser itself and takes the Service port.
+		gate.Ports = append([]corev1.ContainerPort{{Name: "http", ContainerPort: 8080}}, gate.Ports...)
+		pod.Spec.Containers = append(pod.Spec.Containers, gate)
+		pod.Spec.Volumes = append([]corev1.Volume{guardVolume, gateVolume}, dataVolumes...)
+	} else {
+		oauth := corev1.Container{Name: "oauth2-proxy", Image: accesspolicy.OAuthImage, Args: oauthArguments(b.publicURL), SecurityContext: accessSecurityContext(),
+			Ports:          []corev1.ContainerPort{{Name: "http", ContainerPort: 8080}},
+			VolumeMounts:   []corev1.VolumeMount{{Name: "oauth-config", MountPath: "/etc/chat-ui-access", ReadOnly: true}},
+			ReadinessProbe: chatUIHTTPProbe(5, 6), LivenessProbe: chatUIHTTPProbe(10, 6)}
+		oauth.ReadinessProbe.HTTPGet.Path = "/ping"
+		oauth.LivenessProbe.HTTPGet.Path = "/ping"
+		pod.Spec.Containers = append(pod.Spec.Containers, gate, oauth)
+		pod.Spec.Volumes = append([]corev1.Volume{guardVolume, gateVolume,
+			{Name: "oauth-config", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: b.name, Items: []corev1.KeyToPath{{Key: "oauth.json", Path: "oauth.json"}, {Key: "client-secret", Path: "client-secret"}, {Key: "cookie-secret", Path: "cookie-secret"}}}}},
+		}, dataVolumes...)
 	}
 	// Normalize API defaults once so a normal API round trip does not trigger a cutover.
 	*pod = managedAccessTemplate(*pod, *pod)

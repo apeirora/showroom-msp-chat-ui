@@ -43,6 +43,10 @@ type Policy struct {
 	ProxyImage           string      `json:"proxyImage"`
 	Entries              []Entry     `json:"entries"`
 	Enrollment           *Enrollment `json:"enrollment,omitempty"`
+	// PasswordFallback gives an instance without a reviewed mapping a generated
+	// per-instance password instead of refusing access. Mapped instances keep
+	// their per-user sign-in. It replaces enrollment and cannot be combined with it.
+	PasswordFallback bool `json:"passwordFallback,omitempty"`
 }
 
 // Decode strictly reads one bounded document; credentials are never logged.
@@ -96,6 +100,9 @@ func Parse(reader io.Reader) (*Policy, error) {
 	}
 	if err := p.Enrollment.Validate(); err != nil {
 		return nil, err
+	}
+	if p.PasswordFallback && p.Enrollment != nil {
+		return nil, errors.New("password fallback and enrollment are mutually exclusive")
 	}
 	uids, local, sources := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	for _, e := range p.Entries {

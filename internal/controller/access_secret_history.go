@@ -25,7 +25,12 @@ const maxAccessBundles = 3
 // is resumable: a missing non-desired, unused bundle can finish retirement.
 // The desired bundle is checked for a missing/replaced UID before this is called.
 func (r *ChatUIInstanceReconciler) makeAccessSecretRoom(ctx context.Context, inst *uiapi.ChatUIInstance) error {
-	if len(inst.Status.AccessSecretUIDs) <= maxAccessBundles {
+	// The login Secret is a permanent pin like the session key, not a bundle.
+	limit := maxAccessBundles
+	if inst.Status.AccessSecretUIDs[loginSecretName(inst)] != "" {
+		limit++
+	}
+	if len(inst.Status.AccessSecretUIDs) <= limit {
 		return nil
 	}
 	var deployments appsv1.DeploymentList
@@ -46,7 +51,7 @@ func (r *ChatUIInstanceReconciler) makeAccessSecretRoom(ctx context.Context, ins
 	}
 	candidates := make([]corev1.Secret, 0, maxAccessBundles)
 	for name, uid := range inst.Status.AccessSecretUIDs {
-		if name == sessionSecretName(inst) {
+		if name == sessionSecretName(inst) || name == loginSecretName(inst) {
 			continue
 		}
 		if !strings.HasPrefix(name, "chatui-access-") || uid == "" {

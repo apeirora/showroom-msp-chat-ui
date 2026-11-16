@@ -150,6 +150,11 @@ spec:
                   - type
                   type: object
                 type: array
+              loginSecretName:
+                description: |-
+                  LoginSecretName names the operator-generated Secret holding the instance
+                  password. It is set only while the instance uses password access.
+                type: string
               observedGeneration:
                 description: ObservedGeneration reflects the generation observed by
                   the controller.

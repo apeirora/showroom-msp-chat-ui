@@ -41,8 +41,14 @@ func run(path string) error {
 	if err != nil {
 		return err
 	}
-	// Never expose the authorization proxy on the pod's network interface.
-	proxy := &http.Server{Addr: "127.0.0.1:8082", Handler: gate,
+	// Behind the OIDC proxy the authorization proxy is never exposed on the pod's
+	// network interface. In password mode it authenticates the browser itself and
+	// is the pod's listener.
+	address := "127.0.0.1:8082"
+	if config.Mode == accessgate.ModePassword {
+		address = accessgate.PasswordListenAddress
+	}
+	proxy := &http.Server{Addr: address, Handler: gate,
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 65 * time.Second,
 		IdleTimeout: 30 * time.Second, MaxHeaderBytes: 96 << 10}
 	health := &http.Server{Addr: "0.0.0.0:8083", Handler: http.HandlerFunc(gate.Health),

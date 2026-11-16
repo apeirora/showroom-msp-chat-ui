@@ -52,3 +52,23 @@ func TestPolicyRejectsUnsafeAndAmbiguousConfiguration(t *testing.T) {
 		}
 	}
 }
+
+func TestPasswordFallbackIsExplicitAndExcludesEnrollment(t *testing.T) {
+	p, err := Parse(strings.NewReader(validPolicy()))
+	if err != nil || p.PasswordFallback {
+		t.Fatal("password fallback must be off unless configured")
+	}
+	enabled := strings.Replace(validPolicy(), `"entries":`, `"passwordFallback":true,"entries":`, 1)
+	if p, err = Parse(strings.NewReader(enabled)); err != nil || !p.PasswordFallback {
+		t.Fatalf("explicit password fallback rejected: %v", err)
+	}
+	enrollment := `"enrollment":{"configMapName":"chat-ui-enrollment","workspaces":[{"cluster":"account","issuer":"https://issuer.example.test/realms/org","clientID":"chat-ui","clientSecretName":"oidc-client"}]},`
+	withEnrollment := strings.Replace(validPolicy(), `"entries":`, enrollment+`"entries":`, 1)
+	if _, err := Parse(strings.NewReader(withEnrollment)); err != nil {
+		t.Fatalf("enrollment fixture invalid: %v", err)
+	}
+	both := strings.Replace(enabled, `"entries":`, enrollment+`"entries":`, 1)
+	if _, err := Parse(strings.NewReader(both)); err == nil {
+		t.Fatal("password fallback combined with enrollment")
+	}
+}
