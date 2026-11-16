@@ -61,6 +61,9 @@ chat-ui-sync-agent:
     # (operator accessPolicy.passwordFallback). No effect for mapped instances.
     loginSecrets:
       enabled: true
+      # Delete the published copy when its ChatUIInstance is deleted. The field exists
+      # from api-syncagent v0.7.0; the bundled chart 0.5.1 defaults to an older agent.
+      cleanup: false
 
 chat-ui-ui:
   enabled: false   # opt-in; bare operator is enough for the tutorial

@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -224,6 +225,39 @@ func TestPasswordLoginIsRateLimitedPerInstance(t *testing.T) {
 	now = now.Add(loginFailureWindow)
 	if w := f.do(loginRequest(fixturePassword)); w.Code != http.StatusSeeOther || sessionCookie(t, w) == nil {
 		t.Fatalf("limit did not reset: %d", w.Code)
+	}
+}
+
+func TestPasswordLoginLimitHoldsUnderConcurrentAttempts(t *testing.T) {
+	f := newPasswordFixture(t)
+	const attempts = loginFailureLimit * 5
+	codes := make(chan int, attempts)
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := 0; i < attempts; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			codes <- f.do(loginRequest("wrong")).Code
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(codes)
+	rejected, limited := 0, 0
+	for code := range codes {
+		switch code {
+		case http.StatusUnauthorized:
+			rejected++
+		case http.StatusTooManyRequests:
+			limited++
+		default:
+			t.Fatalf("unexpected status %d", code)
+		}
+	}
+	if rejected != loginFailureLimit || limited != attempts-loginFailureLimit {
+		t.Fatalf("%d attempts were compared, limit is %d", rejected, loginFailureLimit)
 	}
 }
 

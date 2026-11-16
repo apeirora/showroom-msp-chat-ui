@@ -16,7 +16,8 @@ spec:
   naming:
     namespace: {{ .Values.publishedResources.naming.namespace | quote }}
     name: "{{`{{ .Object.metadata.name }}`}}"
-{{- $loginSecrets := (.Values.publishedResources.loginSecrets | default dict).enabled }}
+{{- $loginSecretValues := .Values.publishedResources.loginSecrets | default dict }}
+{{- $loginSecrets := $loginSecretValues.enabled }}
 {{- if or .Values.publishedResources.credentialSecrets.enabled $loginSecrets }}
   related:
 {{- if .Values.publishedResources.credentialSecrets.enabled }}
@@ -35,7 +36,9 @@ spec:
     - identifier: login-secret
       origin: service
       kind: Secret
+      {{- if $loginSecretValues.cleanup }}
       cleanup: true
+      {{- end }}
       object:
         template:
           template: "{{`{{ with .Object.status }}{{ with .loginSecretName }}{{ . }}{{ end }}{{ end }}`}}"

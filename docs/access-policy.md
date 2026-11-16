@@ -172,7 +172,9 @@ A password instance differs from a mapped one in these points:
   owned by the instance and pinned by UID like the session key. The pod receives
   only its SHA-256 digest. `status.loginSecretName` names the Secret, and the sync
   agent publishes it into the account that owns the instance
-  (`publishedResources.loginSecrets.enabled`).
+  (`publishedResources.loginSecrets.enabled`). Set `loginSecrets.cleanup: true` to
+  remove that copy when the instance is deleted; it needs api-syncagent v0.7.0 or
+  newer and is off by default.
 - Everyone who signs in shares one application identity derived from the instance
   UID, and therefore one chat history.
 - There is **no per-request KCP permission check**. Whoever can read the Secret in

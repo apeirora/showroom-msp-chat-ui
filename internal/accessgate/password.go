@@ -117,17 +117,23 @@ func (p *passwordAccess) session(r *http.Request) (time.Time, bool) {
 
 // The limit is per instance, not per client: the password is shared and the
 // client address is not trustworthy here. Existing sessions are unaffected.
-func (p *passwordAccess) limited(record bool) bool {
+// Admission, comparison and failure recording happen in one critical section,
+// so concurrent attempts cannot exceed the limit between check and record.
+func (p *passwordAccess) attempt(supplied []byte) (ok, limited bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	now := p.now()
 	if now.Sub(p.windowStart) >= loginFailureWindow {
 		p.windowStart, p.failures = now, 0
 	}
-	if record {
-		p.failures++
+	if p.failures >= loginFailureLimit {
+		return false, true
 	}
-	return p.failures >= loginFailureLimit
+	if subtle.ConstantTimeCompare(supplied, p.digest) == 1 {
+		return true, false
+	}
+	p.failures++
+	return false, false
 }
 
 func (p *passwordAccess) setCookie(w http.ResponseWriter, value string, maxAge int) {
@@ -149,19 +155,20 @@ func (p *passwordAccess) serve(w http.ResponseWriter, r *http.Request, route str
 		}
 		loginPage(w, http.StatusOK, "")
 	case http.MethodPost:
-		if p.limited(false) {
-			w.Header().Set("Retry-After", strconv.Itoa(int(loginFailureWindow.Seconds())))
-			loginPage(w, http.StatusTooManyRequests, "Too many attempts. Try again in a minute.")
-			return
-		}
+		// Read the bounded form before taking the lock; never hold it during I/O.
 		r.Body = http.MaxBytesReader(w, r.Body, maxLoginBody)
 		if err := r.ParseForm(); err != nil {
 			loginPage(w, http.StatusBadRequest, "The request could not be read.")
 			return
 		}
 		supplied := sha256.Sum256([]byte(r.PostForm.Get("password")))
-		if subtle.ConstantTimeCompare(supplied[:], p.digest) != 1 {
-			p.limited(true)
+		ok, limited := p.attempt(supplied[:])
+		if limited {
+			w.Header().Set("Retry-After", strconv.Itoa(int(loginFailureWindow.Seconds())))
+			loginPage(w, http.StatusTooManyRequests, "Too many attempts. Try again in a minute.")
+			return
+		}
+		if !ok {
 			loginPage(w, http.StatusUnauthorized, "That password is not correct.")
 			return
 		}
