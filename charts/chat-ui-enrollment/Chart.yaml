@@ -2,5 +2,5 @@ apiVersion: v2
 name: chat-ui-enrollment
 description: Opt-in trusted source mapping and exact OIDC callback enrollment for Chat UI
 type: application
-version: 0.15.0
-appVersion: 0.15.0
+version: 0.16.0
+appVersion: 0.16.0
