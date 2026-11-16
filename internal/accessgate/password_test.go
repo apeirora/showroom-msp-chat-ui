@@ -14,10 +14,12 @@ import (
 	"github.com/apeirora/showroom-msp-chat-ui/internal/accesspolicy"
 )
 
-const (
-	fixturePassword = "synthetic-instance-password"
-	fixtureIdentity = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@chatui.invalid"
-)
+const fixturePassword = "synthetic-instance-password"
+
+// Synthetic operator-derived identity: 64 hex characters in the reserved domain.
+var fixtureIdentity = strings.Repeat("a", 64) + identityDomain
+
+const identityDomain = "@chatui.invalid"
 
 func passwordConfig(password string, keyByte byte) Config {
 	digest := sha256.Sum256([]byte(password))
@@ -149,7 +151,7 @@ func TestPasswordLoginIssuesSessionAndFixedIdentity(t *testing.T) {
 	r := passwordRequest(http.MethodGet, "/api/models")
 	r.AddCookie(cookie)
 	r.AddCookie(&http.Cookie{Name: "token", Value: "application"})
-	r.Header.Set(EmailHeader, "admin@chatui.invalid")
+	r.Header.Set(EmailHeader, "admin"+identityDomain)
 	r.Header.Set(RoleHeader, "admin")
 	r.Header.Set(TokenHeader, "caller-token")
 	if w := f.do(r); w.Code != http.StatusOK {
