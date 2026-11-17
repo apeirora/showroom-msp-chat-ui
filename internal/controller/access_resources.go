@@ -55,8 +55,19 @@ func sessionSecretName(inst *uiapi.ChatUIInstance) string {
 	return "chatui-session-" + uidHash(string(inst.UID))
 }
 
+// loginSecretName carries the instance name so the Secrets of several instances
+// can be told apart in the account. The UID hash stays: a recreated instance
+// never shares a Secret name with its predecessor. An instance pinned to a
+// Secret from before the name was added keeps it, because that Secret is
+// immutable and already published; the pin outlives status.loginSecretName.
+// The name adds no new limit: one too long for a Secret already fails as the
+// name of the instance's Service.
 func loginSecretName(inst *uiapi.ChatUIInstance) string {
-	return "chatui-login-" + uidHash(string(inst.UID))
+	hash := uidHash(string(inst.UID))
+	if legacy := "chatui-login-" + hash; inst.Status.AccessSecretUIDs[legacy] != "" {
+		return legacy
+	}
+	return "chatui-login-" + inst.Name + "-" + hash
 }
 
 func ownedByInstance(object metav1.Object, inst *uiapi.ChatUIInstance) bool {
