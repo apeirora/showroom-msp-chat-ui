@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.17.0](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.16.1...v0.17.0) (2026-11-17)
+
+
+### Features
+
+* **auth:** name the login Secret after its instance ([#191](https://github.com/apeirora/showroom-msp-chat-ui/issues/191)) ([e1846a6](https://github.com/apeirora/showroom-msp-chat-ui/commit/e1846a622d660662541a261348a4b9fed2156b8d))
+* **chart:** list only Chat UI login Secrets on the Login Secrets page ([#192](https://github.com/apeirora/showroom-msp-chat-ui/issues/192)) ([8c266ba](https://github.com/apeirora/showroom-msp-chat-ui/commit/8c266ba9683241d7d07deb2aa89620ee37776610))
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/evanphx/json-patch/v5 to v5.9.11 ([#178](https://github.com/apeirora/showroom-msp-chat-ui/issues/178)) ([9bbdb2d](https://github.com/apeirora/showroom-msp-chat-ui/commit/9bbdb2db0cc1354a588de24e8186ce350c84d7da))
+* **deps:** update module sigs.k8s.io/yaml to v1.6.0 ([#175](https://github.com/apeirora/showroom-msp-chat-ui/issues/175)) ([a74e974](https://github.com/apeirora/showroom-msp-chat-ui/commit/a74e974dde0366c58e7423e11bfa0c309eda8b8a))
+* **deps:** update opentelemetry-go monorepo to v1.47.0 ([#176](https://github.com/apeirora/showroom-msp-chat-ui/issues/176)) ([5760256](https://github.com/apeirora/showroom-msp-chat-ui/commit/576025695ee4cdeaa1525357b1b3e0911b5b333d))
+
 ## [0.16.1](https://github.com/apeirora/showroom-msp-chat-ui/compare/v0.16.0...v0.16.1) (2026-11-16)
 
 
