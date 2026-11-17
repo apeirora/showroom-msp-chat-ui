@@ -22,7 +22,7 @@ jobs:
       publish_latest: ${{ steps.vars.outputs.publish_latest }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -113,7 +113,7 @@ jobs:
       OCM_REPOSITORY: ${{ needs.publish-image.outputs.ocm_repository }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Helm
         uses: azure/setup-helm@v4
@@ -173,7 +173,7 @@ jobs:
       HELM_CHARTS: "chat-ui-operator chat-ui-enrollment chat-ui-operator-ocm chat-ui-sync-agent chat-ui-pm-integration chat-ui-ui chat-ui-msp-app chat-ui-pm-app"
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download chart artifacts
         uses: actions/download-artifact@v4
