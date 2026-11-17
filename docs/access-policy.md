@@ -168,8 +168,10 @@ A password instance differs from a mapped one in these points:
   sign-in form at `/_chatui/login` and issues the session cookie; no OAuth2 Proxy
   runs. Open WebUI, the guard and every restriction on native credentials, origins
   and WebSocket routes are unchanged.
-- The password is 32 random bytes in the immutable Secret `chatui-login-<hash>`,
-  owned by the instance and pinned by UID like the session key. The pod receives
+- The password is 32 random bytes in the immutable Secret
+  `chatui-login-<instance name>-<hash>`, owned by the instance and pinned by UID
+  like the session key. An instance that received its password before the name
+  carried the instance name keeps its Secret `chatui-login-<hash>`. The pod receives
   only a PBKDF2-HMAC-SHA256 verifier of it (600,000 iterations). `status.loginSecretName` names the Secret, and the sync
   agent publishes it into the account that owns the instance
   (`publishedResources.loginSecrets.enabled`). Set `loginSecrets.cleanup: true` to

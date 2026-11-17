@@ -83,6 +83,9 @@ func TestUnmappedInstanceGetsGeneratedPassword(t *testing.T) {
 	_ = getHostnameIngress(t, r, inst)
 
 	name := loginSecretName(inst)
+	if name != "chatui-login-ui-"+uidHash("uid") {
+		t.Fatalf("login Secret name does not carry the instance name and UID hash: %q", name)
+	}
 	login := readSecretData(t, r, inst.Namespace, name)
 	password := string(login.Data[loginPasswordKey])
 	if !ownedByInstance(login, inst) || login.Immutable == nil || !*login.Immutable || len(password) != loginPasswordLength ||
@@ -281,6 +284,70 @@ func TestLoginSecretIsNeverAdoptedOrRegenerated(t *testing.T) {
 	}
 	if _, err := r.prepareAccess(ctx, inst, "ui.example.test"); err == nil {
 		t.Fatal("adopted a recreated login Secret with copied ownership")
+	}
+}
+
+// legacyPasswordInstance models an instance that received its password before
+// the Secret name carried the instance name: Secret, pin and status as the
+// operator of that release wrote them.
+func legacyPasswordInstance(t *testing.T) (*ChatUIInstanceReconciler, *uiapi.ChatUIInstance, *corev1.Secret) {
+	t.Helper()
+	ctx := context.Background()
+	inst := hostnameInstance("ui", "tenant", "uid")
+	r := passwordReconciler(t, inst)
+	refresh(t, r, inst)
+	legacy := &corev1.Secret{ObjectMeta: readSecretMeta(inst, "chatui-login-"+uidHash("uid")), Immutable: ptrTo(true),
+		Data: map[string][]byte{loginPasswordKey: []byte(strings.Repeat("b", loginPasswordLength))}}
+	legacy.Labels = map[string]string{loginSecretLabel: "true"}
+	if err := ctrl.SetControllerReference(inst, legacy, r.Scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Create(ctx, legacy); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.pinSecret(ctx, inst, legacy, legacy.Name); err != nil {
+		t.Fatal(err)
+	}
+	return r, inst, legacy
+}
+
+func TestInstanceKeepsALoginSecretNamedBeforeTheInstanceNameWasAdded(t *testing.T) {
+	ctx := context.Background()
+	r, inst, legacy := legacyPasswordInstance(t)
+	bundle, err := r.prepareAccess(ctx, inst, "ui.example.test")
+	if err != nil || !bundle.password {
+		t.Fatalf("existing password instance lost access: %v", err)
+	}
+	config := gateConfig(t, readSecretData(t, r, inst.Namespace, bundle.name))
+	salt, _ := base64.StdEncoding.DecodeString(config.PasswordSalt)
+	want, err := accessgate.PasswordVerifier(string(legacy.Data[loginPasswordKey]), salt, accessgate.PasswordIterations)
+	if err != nil || config.PasswordVerifier != base64.StdEncoding.EncodeToString(want) {
+		t.Fatal("the existing password is no longer the one the gate accepts")
+	}
+	var secrets corev1.SecretList
+	if err := r.List(ctx, &secrets, client.InNamespace(inst.Namespace), client.MatchingLabels{loginSecretLabel: "true"}); err != nil ||
+		len(secrets.Items) != 1 || secrets.Items[0].UID != legacy.UID || inst.Status.LoginSecretName != legacy.Name {
+		t.Fatalf("existing instance received a second login Secret or a new name: %d %q %v", len(secrets.Items), inst.Status.LoginSecretName, err)
+	}
+}
+
+// The pin of the old-style Secret remains after a mapping clears
+// status.loginSecretName; bundle retirement must still recognize it.
+func TestOldLoginSecretPinSurvivesMappingAndBundleRotation(t *testing.T) {
+	ctx := context.Background()
+	r, inst, legacy := legacyPasswordInstance(t)
+	if _, err := r.prepareAccess(ctx, inst, "ui.example.test"); err != nil {
+		t.Fatal(err)
+	}
+	configureTestAccess(t, r, inst)
+	for i := 0; i < maxAccessBundles+3; i++ {
+		r.AccessPolicy.ProxyImage = "example.test/controller@sha256:" + strings.Repeat(string(rune('a'+i)), 64)
+		if bundle, err := r.prepareAccess(ctx, inst, "ui.example.test"); err != nil || bundle.password {
+			t.Fatalf("rotation %d failed: %v", i, err)
+		}
+	}
+	if inst.Status.LoginSecretName != "" || inst.Status.AccessSecretUIDs[legacy.Name] != string(legacy.UID) {
+		t.Fatalf("mapping did not clear the name or the old pin was lost: %q", inst.Status.LoginSecretName)
 	}
 }
 
