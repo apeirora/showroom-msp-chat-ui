@@ -164,49 +164,7 @@
                     "loadingIndicator": {
                         "enabled": false
                     },
-                    "keepSelectedForChildren": true,
-                    "url": "/assets/platform-mesh-portal-ui-wc.js#generic-list-view",
-                    "webcomponent": {
-                        "selfRegistered": true,
-                        "type": "module"
-                    },
-                    "context": {
-                        "resourceDefinition": {
-                            "apiGroup": "",
-                            "version": "v1",
-                            "entityCollection": "Secrets",
-                            "entity": "Secret",
-                            "scope": "Namespaced",
-                            "ui": {
-                                "listView": {
-                                    "fields": [
-                                        {
-                                            "label": "Name",
-                                            "property": "metadata.name"
-                                        },
-                                        {
-                                            "label": "Namespace",
-                                            "property": "metadata.namespace"
-                                        },
-                                        {
-                                            "label": "Password",
-                                            "property": "data",
-                                            "propertyField": {
-                                                "key": "password",
-                                                "transform": [
-                                                    "decode"
-                                                ]
-                                            },
-                                            "uiSettings": {
-                                                "displayAs": "secret",
-                                                "withCopyButton": true
-                                            }
-                                        }
-                                    ]
-                                }
-                            }
-                        }
-                    }
+                    "url": "https://{{ .Values.publicHost }}/ui-extensions/login-secrets/?v={{ .Chart.Version }}"
                 }
             ]
         }
