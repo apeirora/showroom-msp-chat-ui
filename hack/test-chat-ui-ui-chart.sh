@@ -48,6 +48,15 @@ assert_contains "$public_host_render" 'mountPath: /usr/share/nginx/html/ui-exten
 assert_contains "$public_host_render" 'padding: 1rem 0 0.75rem;'
 assert_contains "$public_host_render" 'platform-mesh.provider-details.navigate.v1'
 assert_contains "$public_host_render" "img-src 'self' data: https:;"
+# The Login Secrets entry opens the provider's own page, which lists only the
+# labelled login Secrets; the portal's generic list would show every Secret.
+assert_contains "$public_host_render" 'mountPath: /usr/share/nginx/html/ui-extensions/login-secrets/index.html'
+assert_contains "$public_host_render" 'mountPath: /usr/share/nginx/html/ui-extensions/login-secrets/styles.css'
+assert_contains "$public_host_render" 'mountPath: /usr/share/nginx/html/ui-extensions/login-secrets/login-secrets.js'
+login_secrets_chart_version="$(awk '/^version:/ {print $2; exit}' "$chart_dir/Chart.yaml")"
+assert_contains "$public_host_render" "\"url\": \"https://chat-ui.example.com/ui-extensions/login-secrets/?v=$login_secrets_chart_version\""
+assert_contains "$public_host_render" 'const LOGIN_SECRET_SELECTOR = "ui.privatellms.msp/login-secret=true";'
+assert_not_contains "$public_host_render" '"entityCollection": "Secrets"'
 
 default_render="$tmpdir/default.yaml"
 helm template chat-ui-ui "$chart_dir" \

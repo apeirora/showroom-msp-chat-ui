@@ -50,6 +50,7 @@ jobs:
             ajv-formats@3.0.1
           node hack/validate-ord.mjs charts/chat-ui-ui/files/ord
           node hack/test-ord-renderer.mjs
+          node hack/test-login-secrets.mjs
 
   lint-and-test:
     runs-on: ubuntu-latest

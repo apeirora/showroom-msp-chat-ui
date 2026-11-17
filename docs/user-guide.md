@@ -112,8 +112,9 @@ How you sign in depends on how the platform has set up your instance:
 - **Instance password.** The URL shows a password form. The password is in the
   Secret named in `status.loginSecretName` (shown as **Login Secret** in the portal
   detail view), in the same namespace as the instance. In the portal, open
-  **Login Secrets** in the Chat UI sidebar group and reveal or copy the **Password**
-  of that Secret. With kubectl:
+  **Login Secrets** in the Chat UI sidebar group. The page lists only the login
+  Secrets of Chat UI instances, each next to its instance; reveal or copy the
+  **Password** there. With kubectl:
 
   ```bash
   SECRET=$(kubectl get chatuiinstance my-chat -o jsonpath='{.status.loginSecretName}')

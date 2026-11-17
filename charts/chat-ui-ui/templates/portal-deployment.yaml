@@ -64,6 +64,15 @@ spec:
               mountPath: /usr/share/nginx/html/ui-extensions/ord/renderer.js
               subPath: ord-renderer.js
             - name: portal-config
+              mountPath: /usr/share/nginx/html/ui-extensions/login-secrets/index.html
+              subPath: login-secrets-index.html
+            - name: portal-config
+              mountPath: /usr/share/nginx/html/ui-extensions/login-secrets/styles.css
+              subPath: login-secrets-styles.css
+            - name: portal-config
+              mountPath: /usr/share/nginx/html/ui-extensions/login-secrets/login-secrets.js
+              subPath: login-secrets.js
+            - name: portal-config
               mountPath: /etc/nginx/conf.d/default.conf
               subPath: nginx-default.conf
           resources:
@@ -91,6 +100,12 @@ spec:
                 path: ord-renderer-styles.css
               - key: ord-renderer.js
                 path: ord-renderer.js
+              - key: login-secrets-index.html
+                path: login-secrets-index.html
+              - key: login-secrets-styles.css
+                path: login-secrets-styles.css
+              - key: login-secrets.js
+                path: login-secrets.js
               - key: nginx-default.conf
                 path: nginx-default.conf
 {{- end }}
